@@ -1,5 +1,9 @@
 declare const __DEV__: boolean
 
+// ---------------------------------------------------------------------------
+// Three.js WebGPU re-exports
+// ---------------------------------------------------------------------------
+
 declare module 'three/webgpu' {
   import * as THREE from 'three'
 
@@ -29,6 +33,7 @@ declare module 'three/webgpu' {
   export class PostProcessing {
     constructor(renderer: WebGPURenderer)
     outputNode: any
+    needsUpdate: boolean
     render(): void
   }
 
@@ -62,6 +67,10 @@ declare module 'three/webgpu' {
   }
 }
 
+// ---------------------------------------------------------------------------
+// TSL post-processing nodes
+// ---------------------------------------------------------------------------
+
 declare module 'three/addons/tsl/display/BloomNode.js' {
   export default class BloomNode {
     constructor(inputNode: any, strength?: number, radius?: number, threshold?: number)
@@ -69,15 +78,14 @@ declare module 'three/addons/tsl/display/BloomNode.js' {
     radius: { value: number }
     threshold: { value: number }
   }
-  export function bloom(node: any, strength?: number, radius?: number, threshold?: number): any
 }
 
 declare module 'three/addons/tsl/display/AnamorphicNode.js' {
-  export function anamorphic(node: any, threshold?: number, scale?: number, samples?: number): any
+  export function anamorphic(node: any, threshold?: any, scale?: any, samples?: number): any
 }
 
 declare module 'three/addons/tsl/display/DepthOfFieldNode.js' {
-  export function dof(node: any, viewZNode: any, focus?: number, aperture?: number, maxblur?: number): any
+  export function dof(node: any, viewZNode: any, focus?: any, aperture?: any, maxblur?: any): any
 }
 
 declare module 'three/addons/tsl/display/GTAONode.js' {
@@ -87,6 +95,10 @@ declare module 'three/addons/tsl/display/GTAONode.js' {
 declare module 'three/addons/tsl/display/SSRNode.js' {
   export function ssr(colorNode: any, depthNode: any, normalNode: any, metalnessNode: any, camera: any): any
 }
+
+// ---------------------------------------------------------------------------
+// Controls
+// ---------------------------------------------------------------------------
 
 declare module 'three/addons/controls/OrbitControls.js' {
   import { Camera, EventDispatcher } from 'three'

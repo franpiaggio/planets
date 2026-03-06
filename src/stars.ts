@@ -1,9 +1,9 @@
 import {
   Points, BufferGeometry, Float32BufferAttribute, PointsNodeMaterial
 } from 'three/webgpu'
-import { Fn, float, vec3, attribute } from 'three/tsl'
+import { attribute } from 'three/tsl'
 
-export function createStarfield(count = 12000, radius = 50) {
+export function createStarfield(count = 8000, radius = 50) {
   const positions = new Float32Array(count * 3)
   const sizes = new Float32Array(count)
   const colors = new Float32Array(count * 3)

@@ -1,8 +1,8 @@
-import { Color, MeshBasicNodeMaterial, BackSide, FrontSide, AdditiveBlending } from 'three/webgpu'
+import { Color, MeshBasicNodeMaterial, BackSide, AdditiveBlending } from 'three/webgpu'
 import {
-  Fn, float, vec3, color, uniform,
-  positionWorld, positionLocal, normalWorld, normalView, cameraPosition,
-  normalize, dot, pow, mix, smoothstep, max, clamp
+  Fn, float, vec3, uniform,
+  positionWorld, positionLocal, normalWorld, cameraPosition,
+  normalize, dot, pow, mix, smoothstep, clamp
 } from 'three/tsl'
 import { gradientNoise3D } from '../lib/noise'
 

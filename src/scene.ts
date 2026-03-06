@@ -16,18 +16,26 @@ import { createCloudMaterial } from './shaders/clouds'
 import { setupGui } from './gui'
 import { createStarfield } from './stars'
 
+// ---------------------------------------------------------------------------
+// Scene state
+// ---------------------------------------------------------------------------
+
 let camera: PerspectiveCamera
 let scene: Scene
 let renderer: WebGPURenderer
-let postProcessing: any
+let postProcessing: PostProcessing
 let controls: OrbitControls
 let stats: Stats
 let planet: Mesh
 let clouds: Mesh
 let atmosphere: Mesh
 let planetUniforms: ReturnType<typeof createPlanetMaterial>['uniforms']
+let cloudUniformsRef: ReturnType<typeof createCloudMaterial>['uniforms']
 
+// ---------------------------------------------------------------------------
 // Post-processing state
+// ---------------------------------------------------------------------------
+
 let scenePass: any
 let passes: any = {}
 let rawNodes: any = {}
@@ -42,32 +50,36 @@ let effectToggles = {
   ssr: false,
 }
 
+// ---------------------------------------------------------------------------
+// Post-processing pipeline
+// ---------------------------------------------------------------------------
+
 function initPasses() {
   const scenePassColor = scenePass.getTextureNode('output')
   const scenePassDepth = scenePass.getTextureNode('depth')
   const scenePassNormal = scenePass.getTextureNode('normal')
   const scenePassMetalness = scenePass.getTextureNode('metalness')
 
-  // Star bloom only — high threshold so only HDR stars (>1.5) get bloom
-  // Planet has its own atmosphere glow shader, no bloom needed
+  // Bloom — high threshold so only HDR stars (>1.5) bloom
   const bloomNode = new BloomNode(nodeObject(scenePassColor), 0.7, 0.5, 1.5)
-  passes.bloom = nodeObject(bloomNode)
+  passes.bloom = nodeObject(bloomNode as any)
   rawNodes.bloom = bloomNode
 
+  // Anamorphic
   const anaThreshold = uniform(0.9)
   const anaScale = uniform(3.0)
   passes.anamorphic = anamorphic(scenePassColor, anaThreshold, anaScale, 32)
-  passes.anamorphic._thresholdUniform = anaThreshold
-  passes.anamorphic._scaleUniform = anaScale
+  rawNodes.anamorphic = { threshold: anaThreshold, scale: anaScale }
 
+  // Depth of field (auto-focuses on planet via camera distance)
   const scenePassViewZ = scenePass.getViewZNode()
   dofFocusUniform = uniform(7.0)
   dofApertureUniform = uniform(0.0008)
   dofMaxblurUniform = uniform(0.006)
   passes.dof = dof(scenePassColor, scenePassViewZ, dofFocusUniform, dofApertureUniform, dofMaxblurUniform)
-  passes.dof._focusUniform = dofFocusUniform
-  passes.dof._apertureUniform = dofApertureUniform
-  passes.dof._maxblurUniform = dofMaxblurUniform
+  rawNodes.dof = { focus: dofFocusUniform, aperture: dofApertureUniform, maxblur: dofMaxblurUniform }
+
+  // AO & SSR
   passes.ao = ao(scenePassDepth, scenePassNormal, camera)
   passes.ssr = ssr(scenePassColor, scenePassDepth, scenePassNormal, scenePassMetalness, camera)
 
@@ -77,25 +89,11 @@ function initPasses() {
 function buildPostProcessing() {
   let result = passes._scenePassColor
 
-  if (effectToggles.ao) {
-    result = result.mul(passes.ao.getTextureNode())
-  }
-
-  if (effectToggles.ssr) {
-    result = passes.ssr
-  }
-
-  if (effectToggles.bloom) {
-    result = result.add(passes.bloom)
-  }
-
-  if (effectToggles.anamorphic) {
-    result = result.add(passes.anamorphic)
-  }
-
-  if (effectToggles.dof) {
-    result = passes.dof
-  }
+  if (effectToggles.ao) result = result.mul(passes.ao.getTextureNode())
+  if (effectToggles.ssr) result = passes.ssr
+  if (effectToggles.dof) result = passes.dof
+  if (effectToggles.bloom) result = result.add(passes.bloom)
+  if (effectToggles.anamorphic) result = result.add(passes.anamorphic)
 
   postProcessing.outputNode = result
   postProcessing.needsUpdate = true
@@ -106,13 +104,36 @@ export function toggleEffect(name: string, enabled: boolean) {
   buildPostProcessing()
 }
 
+// ---------------------------------------------------------------------------
+// UI
+// ---------------------------------------------------------------------------
+
+function createRandomizeButton(uniforms: typeof planetUniforms) {
+  const btn = document.createElement('button')
+  btn.textContent = 'Randomize'
+  btn.className = 'randomize-btn'
+  btn.addEventListener('click', () => {
+    uniforms.seed.value.set(
+      Math.random() * 100 - 50,
+      Math.random() * 100 - 50,
+      Math.random() * 100 - 50
+    )
+  })
+  document.body.appendChild(btn)
+}
+
+// ---------------------------------------------------------------------------
+// Init
+// ---------------------------------------------------------------------------
+
 export async function init() {
+  // Core
   scene = new Scene()
   scene.background = new Color(0x000005)
-
   camera = new PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100)
   camera.position.set(0, 0, 7)
 
+  // Renderer
   renderer = new WebGPURenderer({ antialias: true })
   renderer.setSize(window.innerWidth, window.innerHeight)
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
@@ -121,29 +142,22 @@ export async function init() {
   document.body.appendChild(renderer.domElement)
   await renderer.init()
 
-  // Post-processing setup with MRT for AO/SSR
+  // Post-processing
   postProcessing = new PostProcessing(renderer)
   scenePass = pass(scene, camera)
-  scenePass.setMRT(mrt({
-    output,
-    normal: normalView,
-    metalness,
-  }))
-
+  scenePass.setMRT(mrt({ output, normal: normalView, metalness }))
   initPasses()
   buildPostProcessing()
 
-  // Stats panel (dev only)
+  // Stats (dev only)
   if (__DEV__) {
     stats = new Stats({ trackGPU: false })
     await stats.init(renderer)
     document.body.appendChild(stats.dom)
-    stats.dom.style.position = 'absolute'
-    stats.dom.style.left = '0px'
-    stats.dom.style.top = '0px'
-    stats.dom.style.zIndex = '100'
+    stats.dom.style.cssText = 'position:absolute;left:0;top:0;z-index:100'
   }
 
+  // Controls
   controls = new OrbitControls(camera, renderer.domElement)
   controls.enableDamping = true
   controls.dampingFactor = 0.05
@@ -170,6 +184,7 @@ export async function init() {
 
   // Clouds
   const { material: cloudMat, uniforms: cloudUniforms } = createCloudMaterial(planetUniforms, atmosUniforms)
+  cloudUniformsRef = cloudUniforms
   clouds = new Mesh(new SphereGeometry(1.06, 64, 64), cloudMat)
   scene.add(clouds)
   atmosphere = new Mesh(new SphereGeometry(1.09, 64, 64), atmosMat)
@@ -178,29 +193,19 @@ export async function init() {
 
   // GUI (dev only)
   if (__DEV__) {
-    const postUniforms = { passes, rawNodes, renderer, toggleEffect, effectToggles }
-    setupGui(planetUniforms, atmosUniforms, cloudUniforms, postUniforms)
+    setupGui(planetUniforms, atmosUniforms, cloudUniforms, { passes, rawNodes, renderer, toggleEffect, effectToggles })
   }
 
-  // Randomize seed button
-  const btn = document.createElement('button')
-  btn.textContent = 'Randomize'
-  btn.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:10px 28px;font-size:16px;font-weight:600;border:none;border-radius:8px;background:rgba(255,255,255,0.12);color:#fff;cursor:pointer;backdrop-filter:blur(8px);z-index:100;transition:background 0.2s'
-  btn.addEventListener('mouseenter', () => { btn.style.background = 'rgba(255,255,255,0.22)' })
-  btn.addEventListener('mouseleave', () => { btn.style.background = 'rgba(255,255,255,0.12)' })
-  btn.addEventListener('click', () => {
-    const s = new Vector3(
-      Math.random() * 100 - 50,
-      Math.random() * 100 - 50,
-      Math.random() * 100 - 50
-    )
-    planetUniforms.seed.value.copy(s)
-  })
-  document.body.appendChild(btn)
+  // Randomize button
+  createRandomizeButton(planetUniforms)
 
   window.addEventListener('resize', onResize)
   renderer.setAnimationLoop(animate)
 }
+
+// ---------------------------------------------------------------------------
+// Loop
+// ---------------------------------------------------------------------------
 
 function animate() {
   planet.rotation.y += 0.002
@@ -208,11 +213,10 @@ function animate() {
   atmosphere.rotation.y += 0.002
 
   planetUniforms.cloudRotationY.value = clouds.rotation.y - planet.rotation.y
+  cloudUniformsRef.uTime.value += 0.016
 
   controls.update()
-  if (dofFocusUniform) {
-    dofFocusUniform.value = camera.position.length()
-  }
+  if (dofFocusUniform) dofFocusUniform.value = camera.position.length()
   postProcessing.render()
 
   if (__DEV__ && stats) stats.update()

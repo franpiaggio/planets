@@ -10,6 +10,7 @@ interface PlanetUniforms {
   seaLevel: { value: number }
   warpStrength: { value: number }
   sunDirection: { value: Vector3 }
+  seed: { value: Vector3 }
 }
 
 interface CloudUniforms {
@@ -39,7 +40,8 @@ interface PostUniforms {
   }
   rawNodes: {
     bloom: { strength: { value: number }; radius: { value: number }; threshold: { value: number } }
-    starBloom: { strength: { value: number }; radius: { value: number }; threshold: { value: number } }
+    anamorphic: { threshold: { value: number }; scale: { value: number } }
+    dof: { focus: { value: number }; aperture: { value: number }; maxblur: { value: number } }
   }
   renderer: { toneMappingExposure: number }
   toggleEffect: (name: string, enabled: boolean) => void
@@ -64,6 +66,14 @@ export function setupGui(planetUniforms: PlanetUniforms, atmosUniforms: Atmosphe
     glowPower: atmosUniforms.glowPower.value,
   }
 
+  const cloudParams = {
+    cloudScale: cloudUniforms.cloudScale.value,
+    cloudDensity: cloudUniforms.cloudDensity.value,
+    cloudSharpness: cloudUniforms.cloudSharpness.value,
+    cloudOpacity: cloudUniforms.cloudOpacity.value,
+    cloudColor: '#' + cloudUniforms.cloudColor.value.getHexString(),
+  }
+
   // Randomize button
   const randomize = () => {
     const types = Object.keys(NOISE_TYPES)
@@ -82,6 +92,15 @@ export function setupGui(planetUniforms: PlanetUniforms, atmosUniforms: Atmosphe
     planetUniforms.seaLevel.value = params.seaLevel
     params.warpStrength = 0.1 + Math.random() * 1.5
     planetUniforms.warpStrength.value = params.warpStrength
+    // Clouds
+    cloudParams.cloudScale = 2.0 + Math.random() * 5.0
+    cloudUniforms.cloudScale.value = cloudParams.cloudScale
+    cloudParams.cloudDensity = 0.3 + Math.random() * 0.4
+    cloudUniforms.cloudDensity.value = cloudParams.cloudDensity
+    cloudParams.cloudSharpness = 1.5 + Math.random() * 6.0
+    cloudUniforms.cloudSharpness.value = cloudParams.cloudSharpness
+    cloudParams.cloudOpacity = 0.2 + Math.random() * 0.5
+    cloudUniforms.cloudOpacity.value = cloudParams.cloudOpacity
     gui.controllersRecursive().forEach(c => c.updateDisplay())
   }
 
@@ -127,14 +146,6 @@ export function setupGui(planetUniforms: PlanetUniforms, atmosUniforms: Atmosphe
 
   // Clouds
   const cloudFolder = gui.addFolder('Clouds')
-
-  const cloudParams = {
-    cloudScale: cloudUniforms.cloudScale.value,
-    cloudDensity: cloudUniforms.cloudDensity.value,
-    cloudSharpness: cloudUniforms.cloudSharpness.value,
-    cloudOpacity: cloudUniforms.cloudOpacity.value,
-    cloudColor: '#' + cloudUniforms.cloudColor.value.getHexString(),
-  }
 
   cloudFolder.add(cloudParams, 'cloudScale', 1.0, 10.0, 0.1).name('Scale').onChange((v: number) => {
     cloudUniforms.cloudScale.value = v
@@ -205,19 +216,19 @@ export function setupGui(planetUniforms: PlanetUniforms, atmosUniforms: Atmosphe
   anaFolder.add({ enabled: postUniforms.effectToggles.anamorphic }, 'enabled').name('Enabled').onChange((v: boolean) => {
     postUniforms.toggleEffect('anamorphic', v)
   })
-  const ap = postUniforms.passes.anamorphic
-  anaFolder.add({ v: ap._thresholdUniform.value }, 'v', 0.0, 2.0, 0.05).name('Threshold').onChange((v: number) => { ap._thresholdUniform.value = v })
-  anaFolder.add({ v: ap._scaleUniform.value }, 'v', 0.5, 10.0, 0.1).name('Scale').onChange((v: number) => { ap._scaleUniform.value = v })
+  const an = postUniforms.rawNodes.anamorphic
+  anaFolder.add({ v: an.threshold.value }, 'v', 0.0, 2.0, 0.05).name('Threshold').onChange((v: number) => { an.threshold.value = v })
+  anaFolder.add({ v: an.scale.value }, 'v', 0.5, 10.0, 0.1).name('Scale').onChange((v: number) => { an.scale.value = v })
 
   // DOF
   const dofFolder = postFolder.addFolder('Depth of Field')
   dofFolder.add({ enabled: postUniforms.effectToggles.dof }, 'enabled').name('Enabled').onChange((v: boolean) => {
     postUniforms.toggleEffect('dof', v)
   })
-  const dp = postUniforms.passes.dof
-  dofFolder.add({ v: dp._focusUniform.value }, 'v', 0.5, 20.0, 0.1).name('Focus Distance').onChange((v: number) => { dp._focusUniform.value = v })
-  dofFolder.add({ v: dp._apertureUniform.value }, 'v', 0.001, 0.1, 0.001).name('Aperture').onChange((v: number) => { dp._apertureUniform.value = v })
-  dofFolder.add({ v: dp._maxblurUniform.value }, 'v', 0.0, 2.0, 0.05).name('Max Blur').onChange((v: number) => { dp._maxblurUniform.value = v })
+  const dp = postUniforms.rawNodes.dof
+  dofFolder.add({ v: dp.focus.value }, 'v', 0.5, 20.0, 0.1).name('Focus Distance').onChange((v: number) => { dp.focus.value = v })
+  dofFolder.add({ v: dp.aperture.value }, 'v', 0.0001, 0.01, 0.0001).name('Aperture').onChange((v: number) => { dp.aperture.value = v })
+  dofFolder.add({ v: dp.maxblur.value }, 'v', 0.0, 0.05, 0.001).name('Max Blur').onChange((v: number) => { dp.maxblur.value = v })
 
   // AO
   const aoFolder = postFolder.addFolder('Ambient Occlusion')

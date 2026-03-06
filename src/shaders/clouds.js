@@ -14,6 +14,7 @@ export function createCloudMaterial(planetUniforms, atmosUniforms) {
     cloudOpacity: uniform(0.45),
     cloudColor: uniform(new Color(0xffffff)),
     surfaceTint: uniform(0.1),
+    uTime: uniform(0.0),
   }
 
   // Lightweight 3-octave FBM using gradientNoise3D directly
@@ -25,7 +26,9 @@ export function createCloudMaterial(planetUniforms, atmosUniforms) {
 
   // Domain warping for clouds — same technique as terrain, different offsets
   const warpedCloudPos = Fn(([pos]) => {
-    const scaled = pos.add(planetUniforms.seed).mul(uniforms.cloudScale)
+    // Slowly drift cloud noise over time for natural evolution
+    const timeOffset = vec3(uniforms.uTime.mul(0.02), uniforms.uTime.mul(0.013), uniforms.uTime.mul(0.017))
+    const scaled = pos.add(planetUniforms.seed).add(timeOffset).mul(uniforms.cloudScale)
 
     const warp1x = gradientNoise3D(scaled.add(vec3(9.2, 1.7, 4.3))).sub(0.5)
     const warp1y = gradientNoise3D(scaled.add(vec3(2.3, 8.1, 0.7))).sub(0.5)
