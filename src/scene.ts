@@ -13,7 +13,7 @@ import Stats from 'stats-gl'
 import { createPlanetMaterial } from './shaders/planet'
 import { createAtmosphereMaterial, applyInnerGlow } from './shaders/atmosphere'
 import { createCloudMaterial } from './shaders/clouds'
-import { setupGui } from './gui'
+import { setupGui, refreshGui } from './gui'
 import { createStarfield } from './stars'
 import { PALETTES } from './palettes'
 import type { PlanetPalette } from './palettes'
@@ -130,19 +130,42 @@ function applyPalette(palette: PlanetPalette) {
   cloudUniformsRef.cloudColor.value.set(palette.cloud)
 }
 
+function randomizePlanet() {
+  // Seed
+  planetUniforms.seed.value.set(
+    Math.random() * 100 - 50,
+    Math.random() * 100 - 50,
+    Math.random() * 100 - 50
+  )
+
+  // Palette
+  const palette = PALETTES[Math.floor(Math.random() * PALETTES.length)]
+  applyPalette(palette)
+
+  // Noise params
+  const types = [1, 2]
+  planetUniforms.noiseType.value = types[Math.floor(Math.random() * types.length)]
+  planetUniforms.noiseScale.value = 1.5 + Math.random() * 3.5
+  planetUniforms.lacunarity.value = 1.5 + Math.random() * 1.5
+  planetUniforms.gain.value = 0.2 + Math.random() * 0.5
+  planetUniforms.terrainHeight.value = 0.1 + Math.random() * 0.8
+  planetUniforms.warpStrength.value = 0.1 + Math.random() * 1.5
+
+  // Clouds
+  cloudUniformsRef.cloudScale.value = 2.0 + Math.random() * 5.0
+  cloudUniformsRef.cloudDensity.value = 0.3 + Math.random() * 0.4
+  cloudUniformsRef.cloudSharpness.value = 1.5 + Math.random() * 6.0
+  cloudUniformsRef.cloudOpacity.value = 0.2 + Math.random() * 0.5
+
+  // Sync GUI if active
+  refreshGui()
+}
+
 function createRandomizeButton() {
   const btn = document.createElement('button')
   btn.textContent = 'Randomize'
   btn.className = 'randomize-btn'
-  btn.addEventListener('click', () => {
-    planetUniforms.seed.value.set(
-      Math.random() * 100 - 50,
-      Math.random() * 100 - 50,
-      Math.random() * 100 - 50
-    )
-    const palette = PALETTES[Math.floor(Math.random() * PALETTES.length)]
-    applyPalette(palette)
-  })
+  btn.addEventListener('click', randomizePlanet)
   document.body.appendChild(btn)
 }
 

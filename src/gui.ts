@@ -48,8 +48,44 @@ interface PostUniforms {
   effectToggles: Record<string, boolean>
 }
 
+let guiInstance: GUI | null = null
+let guiParams: any = null
+let guiCloudParams: any = null
+let guiPlanetUniforms: PlanetUniforms | null = null
+let guiAtmosUniforms: AtmosphereUniforms | null = null
+let guiCloudUniforms: CloudUniforms | null = null
+
+export function refreshGui() {
+  if (!guiInstance || !guiParams || !guiPlanetUniforms || !guiAtmosUniforms || !guiCloudUniforms) return
+
+  const p = guiPlanetUniforms
+  const noiseTypeEntries = Object.entries(NOISE_TYPES)
+  const found = noiseTypeEntries.find(([, v]) => v === p.noiseType.value)
+  guiParams.noiseType = found ? found[0] : 'Simplex'
+  guiParams.noiseScale = p.noiseScale.value
+  guiParams.lacunarity = p.lacunarity.value
+  guiParams.gain = p.gain.value
+  guiParams.terrainHeight = p.terrainHeight.value
+  guiParams.seaLevel = p.seaLevel.value
+  guiParams.warpStrength = p.warpStrength.value
+  guiParams.atmosphereColor = '#' + guiAtmosUniforms.atmosphereColor.value.getHexString()
+  guiParams.twilightColor = '#' + guiAtmosUniforms.twilightColor.value.getHexString()
+
+  guiCloudParams.cloudScale = guiCloudUniforms.cloudScale.value
+  guiCloudParams.cloudDensity = guiCloudUniforms.cloudDensity.value
+  guiCloudParams.cloudSharpness = guiCloudUniforms.cloudSharpness.value
+  guiCloudParams.cloudOpacity = guiCloudUniforms.cloudOpacity.value
+  guiCloudParams.cloudColor = '#' + guiCloudUniforms.cloudColor.value.getHexString()
+
+  guiInstance.controllersRecursive().forEach(c => c.updateDisplay())
+}
+
 export function setupGui(planetUniforms: PlanetUniforms, atmosUniforms: AtmosphereUniforms, cloudUniforms: CloudUniforms, postUniforms: PostUniforms) {
   const gui = new GUI({ title: 'Planet Controls' })
+  guiInstance = gui
+  guiPlanetUniforms = planetUniforms
+  guiAtmosUniforms = atmosUniforms
+  guiCloudUniforms = cloudUniforms
 
   const params = {
     noiseType: 'Simplex',
@@ -73,6 +109,8 @@ export function setupGui(planetUniforms: PlanetUniforms, atmosUniforms: Atmosphe
     cloudOpacity: cloudUniforms.cloudOpacity.value,
     cloudColor: '#' + cloudUniforms.cloudColor.value.getHexString(),
   }
+  guiParams = params
+  guiCloudParams = cloudParams
 
   // Randomize button
   const randomize = () => {
