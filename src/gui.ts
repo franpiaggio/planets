@@ -34,6 +34,11 @@ const NOISE_TYPES: Record<string, number> = {
   'Simplex': 2,
 }
 
+interface MeshVisibility {
+  clouds: { visible: boolean }
+  atmosphere: { visible: boolean }
+}
+
 interface PostUniforms {
   passes: {
     [key: string]: any
@@ -51,9 +56,11 @@ interface PostUniforms {
 let guiInstance: GUI | null = null
 let guiParams: any = null
 let guiCloudParams: any = null
+let guiVisibilityParams: any = null
 let guiPlanetUniforms: PlanetUniforms | null = null
 let guiAtmosUniforms: AtmosphereUniforms | null = null
 let guiCloudUniforms: CloudUniforms | null = null
+let guiMeshes: MeshVisibility | null = null
 
 export function refreshGui() {
   if (!guiInstance || !guiParams || !guiPlanetUniforms || !guiAtmosUniforms || !guiCloudUniforms) return
@@ -70,6 +77,9 @@ export function refreshGui() {
   guiParams.warpStrength = p.warpStrength.value
   guiParams.atmosphereColor = '#' + guiAtmosUniforms.atmosphereColor.value.getHexString()
   guiParams.twilightColor = '#' + guiAtmosUniforms.twilightColor.value.getHexString()
+  guiParams.glowIntensity = guiAtmosUniforms.glowIntensity.value
+  guiParams.glowCoefficient = guiAtmosUniforms.glowCoefficient.value
+  guiParams.glowPower = guiAtmosUniforms.glowPower.value
 
   guiCloudParams.cloudScale = guiCloudUniforms.cloudScale.value
   guiCloudParams.cloudDensity = guiCloudUniforms.cloudDensity.value
@@ -77,15 +87,21 @@ export function refreshGui() {
   guiCloudParams.cloudOpacity = guiCloudUniforms.cloudOpacity.value
   guiCloudParams.cloudColor = '#' + guiCloudUniforms.cloudColor.value.getHexString()
 
+  if (guiVisibilityParams && guiMeshes) {
+    guiVisibilityParams.showClouds = guiMeshes.clouds.visible
+    guiVisibilityParams.showAtmosphere = guiMeshes.atmosphere.visible
+  }
+
   guiInstance.controllersRecursive().forEach(c => c.updateDisplay())
 }
 
-export function setupGui(planetUniforms: PlanetUniforms, atmosUniforms: AtmosphereUniforms, cloudUniforms: CloudUniforms, postUniforms: PostUniforms) {
+export function setupGui(planetUniforms: PlanetUniforms, atmosUniforms: AtmosphereUniforms, cloudUniforms: CloudUniforms, postUniforms: PostUniforms, meshes: MeshVisibility) {
   const gui = new GUI({ title: 'Planet Controls' })
   guiInstance = gui
   guiPlanetUniforms = planetUniforms
   guiAtmosUniforms = atmosUniforms
   guiCloudUniforms = cloudUniforms
+  guiMeshes = meshes
 
   const params = {
     noiseType: 'Simplex',
@@ -185,6 +201,13 @@ export function setupGui(planetUniforms: PlanetUniforms, atmosUniforms: Atmosphe
   // Clouds
   const cloudFolder = gui.addFolder('Clouds')
 
+  const visibilityParams = { showClouds: meshes.clouds.visible, showAtmosphere: meshes.atmosphere.visible }
+  guiVisibilityParams = visibilityParams
+
+  cloudFolder.add(visibilityParams, 'showClouds').name('Visible').onChange((v: boolean) => {
+    meshes.clouds.visible = v
+  })
+
   cloudFolder.add(cloudParams, 'cloudScale', 1.0, 10.0, 0.1).name('Scale').onChange((v: number) => {
     cloudUniforms.cloudScale.value = v
   })
@@ -209,6 +232,10 @@ export function setupGui(planetUniforms: PlanetUniforms, atmosUniforms: Atmosphe
 
   // Atmosphere
   const atmosFolder = gui.addFolder('Atmosphere')
+
+  atmosFolder.add(visibilityParams, 'showAtmosphere').name('Visible').onChange((v: boolean) => {
+    meshes.atmosphere.visible = v
+  })
 
   atmosFolder.addColor(params, 'atmosphereColor').name('Day Color').onChange((v: string) => {
     atmosUniforms.atmosphereColor.value.set(v)

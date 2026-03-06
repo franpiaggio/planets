@@ -1,5 +1,5 @@
 import {
-  PerspectiveCamera, Scene, Color, SphereGeometry, Mesh, WebGPURenderer,
+  PerspectiveCamera, Scene, Color, SphereGeometry, Mesh, Group, WebGPURenderer,
   DirectionalLight, AmbientLight, PostProcessing, Vector3
 } from 'three/webgpu'
 import { pass, mrt, output, normalView, metalness, uniform, nodeObject } from 'three/tsl'
@@ -28,6 +28,7 @@ let renderer: WebGPURenderer
 let postProcessing: PostProcessing
 let controls: OrbitControls
 let stats: Stats
+let planetGroup: Group
 let planet: Mesh
 let clouds: Mesh
 let atmosphere: Mesh
@@ -157,6 +158,26 @@ function randomizePlanet() {
   cloudUniformsRef.cloudSharpness.value = 3.0 + (Math.random() - 0.5) * 2.0 // 2.0–4.0
   cloudUniformsRef.cloudOpacity.value = 0.45 + (Math.random() - 0.5) * 0.2  // 0.35–0.55
 
+  // Subtle atmosphere variation
+  atmosUniformsRef.glowIntensity.value = 0.5 + (Math.random() - 0.5) * 0.3  // 0.35–0.65
+  atmosUniformsRef.glowCoefficient.value = 0.55 + (Math.random() - 0.5) * 0.2 // 0.45–0.65
+  atmosUniformsRef.glowPower.value = 8.0 + (Math.random() - 0.5) * 3.0      // 6.5–9.5
+
+  // Planet size and shape
+  const baseScale = 0.6 + Math.random() * 0.8                               // 0.6–1.4
+  const deformX = 1.0 + (Math.random() - 0.5) * 0.12                        // 0.94–1.06
+  const deformY = 1.0 + (Math.random() - 0.5) * 0.12                        // oblate/prolate
+  const deformZ = 1.0 + (Math.random() - 0.5) * 0.12
+  planetGroup.scale.set(baseScale * deformX, baseScale * deformY, baseScale * deformZ)
+
+  // Random clouds/atmosphere visibility
+  clouds.visible = Math.random() > 0.25        // 75% have clouds
+  atmosphere.visible = Math.random() > 0.15    // 85% have atmosphere
+
+  // Axial tilt (radians, ±25°)
+  planetGroup.rotation.x = (Math.random() - 0.5) * 0.87
+  planetGroup.rotation.z = (Math.random() - 0.5) * 0.87
+
   // Sync GUI if active
   refreshGui()
 }
@@ -223,11 +244,14 @@ export async function init() {
   // Stars
   scene.add(createStarfield())
 
-  // Planet
+  // Planet group (shared scale/deformation)
+  planetGroup = new Group()
+  scene.add(planetGroup)
+
   const planetResult = createPlanetMaterial()
   planetUniforms = planetResult.uniforms
   planet = new Mesh(new SphereGeometry(1, 96, 96), planetResult.material)
-  scene.add(planet)
+  planetGroup.add(planet)
 
   // Atmosphere
   const { material: atmosMat, uniforms: atmosUniforms } = createAtmosphereMaterial(planetUniforms)
@@ -237,14 +261,14 @@ export async function init() {
   const { material: cloudMat, uniforms: cloudUniforms } = createCloudMaterial(planetUniforms, atmosUniforms)
   cloudUniformsRef = cloudUniforms
   clouds = new Mesh(new SphereGeometry(1.06, 64, 64), cloudMat)
-  scene.add(clouds)
+  planetGroup.add(clouds)
   atmosphere = new Mesh(new SphereGeometry(1.09, 64, 64), atmosMat)
-  scene.add(atmosphere)
+  planetGroup.add(atmosphere)
   applyInnerGlow(planetResult.material, planetUniforms, atmosUniforms)
 
   // GUI (dev only)
   if (__DEV__) {
-    setupGui(planetUniforms, atmosUniforms, cloudUniforms, { passes, rawNodes, renderer, toggleEffect, effectToggles })
+    setupGui(planetUniforms, atmosUniforms, cloudUniforms, { passes, rawNodes, renderer, toggleEffect, effectToggles }, { clouds, atmosphere })
   }
 
   // Randomize button
