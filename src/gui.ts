@@ -35,8 +35,11 @@ const NOISE_TYPES: Record<string, number> = {
 
 interface PostUniforms {
   passes: {
-    bloom?: { strength: { value: number }; radius: { value: number }; threshold: { value: number } }
     [key: string]: any
+  }
+  rawNodes: {
+    bloom: { strength: { value: number }; radius: { value: number }; threshold: { value: number } }
+    starBloom: { strength: { value: number }; radius: { value: number }; threshold: { value: number } }
   }
   renderer: { toneMappingExposure: number }
   toggleEffect: (name: string, enabled: boolean) => void
@@ -187,15 +190,15 @@ export function setupGui(planetUniforms: PlanetUniforms, atmosUniforms: Atmosphe
     postUniforms.renderer.toneMappingExposure = v
   })
 
-  // Bloom
+  // Bloom (stars only — high threshold)
   const bloomFolder = postFolder.addFolder('Bloom')
   bloomFolder.add({ enabled: postUniforms.effectToggles.bloom }, 'enabled').name('Enabled').onChange((v: boolean) => {
     postUniforms.toggleEffect('bloom', v)
   })
-  const bp = postUniforms.passes.bloom
+  const bp = postUniforms.rawNodes.bloom
   bloomFolder.add({ v: bp.strength.value }, 'v', 0.0, 3.0, 0.05).name('Strength').onChange((v: number) => { bp.strength.value = v })
   bloomFolder.add({ v: bp.radius.value }, 'v', 0.0, 1.0, 0.05).name('Radius').onChange((v: number) => { bp.radius.value = v })
-  bloomFolder.add({ v: bp.threshold.value }, 'v', 0.0, 1.0, 0.05).name('Threshold').onChange((v: number) => { bp.threshold.value = v })
+  bloomFolder.add({ v: bp.threshold.value }, 'v', 0.0, 3.0, 0.05).name('Threshold').onChange((v: number) => { bp.threshold.value = v })
 
   // Anamorphic
   const anaFolder = postFolder.addFolder('Anamorphic')

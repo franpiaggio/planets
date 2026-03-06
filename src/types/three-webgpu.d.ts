@@ -57,11 +57,18 @@ declare module 'three/webgpu' {
   export class PointsNodeMaterial extends THREE.Material {
     colorNode: any
     sizeNode: any
+    sizeAttenuation: boolean
     vertexColors: boolean
   }
 }
 
 declare module 'three/addons/tsl/display/BloomNode.js' {
+  export default class BloomNode {
+    constructor(inputNode: any, strength?: number, radius?: number, threshold?: number)
+    strength: { value: number }
+    radius: { value: number }
+    threshold: { value: number }
+  }
   export function bloom(node: any, strength?: number, radius?: number, threshold?: number): any
 }
 

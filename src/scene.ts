@@ -2,8 +2,8 @@ import {
   PerspectiveCamera, Scene, Color, SphereGeometry, Mesh, WebGPURenderer,
   DirectionalLight, AmbientLight, PostProcessing, Vector3
 } from 'three/webgpu'
-import { pass, mrt, output, normalView, metalness, uniform } from 'three/tsl'
-import { bloom } from 'three/addons/tsl/display/BloomNode.js'
+import { pass, mrt, output, normalView, metalness, uniform, nodeObject } from 'three/tsl'
+import BloomNode from 'three/addons/tsl/display/BloomNode.js'
 import { anamorphic } from 'three/addons/tsl/display/AnamorphicNode.js'
 import { dof } from 'three/addons/tsl/display/DepthOfFieldNode.js'
 import { ao } from 'three/addons/tsl/display/GTAONode.js'
@@ -30,10 +30,14 @@ let planetUniforms: ReturnType<typeof createPlanetMaterial>['uniforms']
 // Post-processing state
 let scenePass: any
 let passes: any = {}
+let rawNodes: any = {}
+let dofFocusUniform: any
+let dofApertureUniform: any
+let dofMaxblurUniform: any
 let effectToggles = {
   bloom: true,
   anamorphic: false,
-  dof: false,
+  dof: true,
   ao: false,
   ssr: false,
 }
@@ -44,8 +48,11 @@ function initPasses() {
   const scenePassNormal = scenePass.getTextureNode('normal')
   const scenePassMetalness = scenePass.getTextureNode('metalness')
 
-  // Pre-create all passes with uniforms so GUI can modify parameters at runtime
-  passes.bloom = bloom(scenePassColor, 0.4, 0.4, 0.2)
+  // Star bloom only — high threshold so only HDR stars (>1.5) get bloom
+  // Planet has its own atmosphere glow shader, no bloom needed
+  const bloomNode = new BloomNode(nodeObject(scenePassColor), 0.7, 0.5, 1.5)
+  passes.bloom = nodeObject(bloomNode)
+  rawNodes.bloom = bloomNode
 
   const anaThreshold = uniform(0.9)
   const anaScale = uniform(3.0)
@@ -53,13 +60,14 @@ function initPasses() {
   passes.anamorphic._thresholdUniform = anaThreshold
   passes.anamorphic._scaleUniform = anaScale
 
-  const dofFocus = uniform(4.0)
-  const dofAperture = uniform(0.01)
-  const dofMaxblur = uniform(0.5)
-  passes.dof = dof(scenePassColor, scenePassDepth, dofFocus, dofAperture, dofMaxblur)
-  passes.dof._focusUniform = dofFocus
-  passes.dof._apertureUniform = dofAperture
-  passes.dof._maxblurUniform = dofMaxblur
+  const scenePassViewZ = scenePass.getViewZNode()
+  dofFocusUniform = uniform(7.0)
+  dofApertureUniform = uniform(0.0008)
+  dofMaxblurUniform = uniform(0.006)
+  passes.dof = dof(scenePassColor, scenePassViewZ, dofFocusUniform, dofApertureUniform, dofMaxblurUniform)
+  passes.dof._focusUniform = dofFocusUniform
+  passes.dof._apertureUniform = dofApertureUniform
+  passes.dof._maxblurUniform = dofMaxblurUniform
   passes.ao = ao(scenePassDepth, scenePassNormal, camera)
   passes.ssr = ssr(scenePassColor, scenePassDepth, scenePassNormal, scenePassMetalness, camera)
 
@@ -103,7 +111,7 @@ export async function init() {
   scene.background = new Color(0x000005)
 
   camera = new PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100)
-  camera.position.set(0, 0, 4)
+  camera.position.set(0, 0, 7)
 
   renderer = new WebGPURenderer({ antialias: true })
   renderer.setSize(window.innerWidth, window.innerHeight)
@@ -149,7 +157,7 @@ export async function init() {
   scene.add(new AmbientLight(0x404060, 0.3))
 
   // Stars
-  scene.add(createStarfield(25000, 50))
+  scene.add(createStarfield())
 
   // Planet
   const planetResult = createPlanetMaterial()
@@ -170,7 +178,7 @@ export async function init() {
 
   // GUI (dev only)
   if (__DEV__) {
-    const postUniforms = { passes, renderer, toggleEffect, effectToggles }
+    const postUniforms = { passes, rawNodes, renderer, toggleEffect, effectToggles }
     setupGui(planetUniforms, atmosUniforms, cloudUniforms, postUniforms)
   }
 
@@ -202,6 +210,9 @@ function animate() {
   planetUniforms.cloudRotationY.value = clouds.rotation.y - planet.rotation.y
 
   controls.update()
+  if (dofFocusUniform) {
+    dofFocusUniform.value = camera.position.length()
+  }
   postProcessing.render()
 
   if (__DEV__ && stats) stats.update()
