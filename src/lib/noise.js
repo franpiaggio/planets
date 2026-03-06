@@ -209,6 +209,9 @@ const simplexNoise3D = Fn(([p]) => {
 // Noise lookup by type index
 // ============================================
 
+// Single-type exports for cheap detail layers (1/5 cost of sampleNoise)
+export { gradientNoise3D, voronoiNoise3D, ridgedNoise3D }
+
 // Type 0 = Value, 1 = Gradient, 2 = Simplex, 3 = Voronoi, 4 = Ridged
 export const sampleNoise = Fn(([p, noiseType]) => {
   const result = float(0.0).toVar()

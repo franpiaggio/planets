@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "lil-gui": "^0.21.0",
+    "stats-gl": "^4.1.0",
     "three": "^0.175.0"
   },
   "devDependencies": {
