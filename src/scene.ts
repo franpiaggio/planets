@@ -210,7 +210,7 @@ export async function init() {
   scene = new Scene()
   scene.background = new Color(0x000005)
   camera = new PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100)
-  camera.position.set(0, 0, 7)
+  camera.position.set(0, 0, 5)
 
   // Renderer
   renderer = new WebGPURenderer({ antialias: true })
@@ -244,7 +244,7 @@ export async function init() {
   controls.rotateSpeed = 0.5
   controls.zoomSpeed = 0.5
   controls.minDistance = 2
-  controls.maxDistance = 12
+  controls.maxDistance = 7
 
   // Lighting
   sun = new DirectionalLight(0xffffff, 1.8)
