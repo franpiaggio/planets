@@ -9,16 +9,12 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@react-three/drei": "^9.116.0",
-    "@react-three/fiber": "^9.1.0",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
+    "lil-gui": "^0.21.0",
     "three": "^0.175.0"
   },
   "devDependencies": {
-    "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0",
-    "@vitejs/plugin-react": "^4.4.0",
+    "@types/three": "^0.183.1",
+    "typescript": "^5.9.3",
     "vite": "^6.2.0"
   }
 }
