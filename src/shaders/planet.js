@@ -1,51 +1,55 @@
-import { Vector3, MeshStandardNodeMaterial } from 'three/webgpu'
+import { Vector3, Color, MeshStandardNodeMaterial } from 'three/webgpu'
 import {
-  Fn, float, vec3, color, uniform,
+  Fn, float, vec3, uniform,
   positionLocal, normalLocal,
   mix, smoothstep, cos, sin
 } from 'three/tsl'
 import { fbm, gradientNoise3D } from '../lib/noise'
-
-// ---------------------------------------------------------------------------
-// Biome color palette (elevation-based)
-// ---------------------------------------------------------------------------
-
-const BIOME_COLORS = {
-  deepOcean:    0x0a1e3d,
-  midOcean:     0x0c3d6b,
-  shallowWater: 0x1a6e8e,
-  coast:        0x2a8a8a,
-  sand:         0xc2a55a,
-  sand2:        0xd4b86a,
-  savanna:      0x8a9a3a,
-  savanna2:     0xa0a848,
-  grass:        0x4a7a2e,
-  grass2:       0x3a6e28,
-  forest:       0x1e4a18,
-  forest2:      0x2a5a1a,
-  rock:         0x6a5a48,
-  rock2:        0x524030,
-  snow:         0xf2f2f8,
-  snowDirty:    0xc8c0b8,
-}
+import { PALETTES } from '../palettes'
 
 // ---------------------------------------------------------------------------
 // Planet material
 // ---------------------------------------------------------------------------
 
+function createBiomeUniforms(palette) {
+  const b = palette.biome
+  return {
+    deepOcean:    uniform(new Color(b.deepOcean)),
+    midOcean:     uniform(new Color(b.midOcean)),
+    shallowWater: uniform(new Color(b.shallowWater)),
+    coast:        uniform(new Color(b.coast)),
+    sand:         uniform(new Color(b.sand)),
+    sand2:        uniform(new Color(b.sand2)),
+    savanna:      uniform(new Color(b.savanna)),
+    savanna2:     uniform(new Color(b.savanna2)),
+    grass:        uniform(new Color(b.grass)),
+    grass2:       uniform(new Color(b.grass2)),
+    forest:       uniform(new Color(b.forest)),
+    forest2:      uniform(new Color(b.forest2)),
+    rock:         uniform(new Color(b.rock)),
+    rock2:        uniform(new Color(b.rock2)),
+    snow:         uniform(new Color(b.snow)),
+    snowDirty:    uniform(new Color(b.snowDirty)),
+  }
+}
+
 export function createPlanetMaterial() {
+  const defaultPalette = PALETTES[0]
+  const biome = createBiomeUniforms(defaultPalette)
+
   const uniforms = {
     noiseType: uniform(2),
     noiseScale: uniform(2.2),
     lacunarity: uniform(2.2),
     gain: uniform(0.45),
     terrainHeight: uniform(0.45),
-    seaLevel: uniform(0.50),
+    seaLevel: uniform(defaultPalette.seaLevel),
     warpStrength: uniform(0.55),
     sunDirection: uniform(new Vector3(1, 0.3, 0.5).normalize()),
     cloudRotationY: uniform(0.0),
     cloudShadow: uniform(0.3),
     seed: uniform(new Vector3(0, 0, 0)),
+    ...biome,
   }
 
   const material = new MeshStandardNodeMaterial()
@@ -88,7 +92,6 @@ export function createPlanetMaterial() {
     const cw1z = gradientNoise3D(cScaled.add(vec3(5.7, 3.1, 9.0))).sub(0.5)
     const cwp = cScaled.add(vec3(cw1x, cw1y, cw1z).mul(uniforms.warpStrength.mul(0.6)))
 
-    // 3-octave FBM
     const cn = gradientNoise3D(cwp).mul(0.5)
       .add(gradientNoise3D(cwp.mul(2.2)).mul(0.25))
       .add(gradientNoise3D(cwp.mul(4.84)).mul(0.125))
@@ -112,23 +115,19 @@ export function createPlanetMaterial() {
     const pos = positionLocal
     const elevation = getElevation(pos)
     const sea = uniforms.seaLevel
-
-    // Color variation from warped noise
     const cv = gradientNoise3D(warpedPos(pos).mul(3.0))
 
-    const c = BIOME_COLORS
-    const col = vec3(color(c.deepOcean)).toVar()
-    col.assign(mix(col, color(c.midOcean),     smoothstep(sea.sub(0.15), sea.sub(0.06), elevation)))
-    col.assign(mix(col, color(c.shallowWater), smoothstep(sea.sub(0.06), sea.sub(0.02), elevation)))
-    col.assign(mix(col, color(c.coast),        smoothstep(sea.sub(0.02), sea, elevation)))
-    col.assign(mix(col, mix(color(c.sand),    color(c.sand2),    cv), smoothstep(sea, sea.add(0.01), elevation)))
-    col.assign(mix(col, mix(color(c.savanna), color(c.savanna2), cv), smoothstep(sea.add(0.01), sea.add(0.035), elevation)))
-    col.assign(mix(col, mix(color(c.grass),   color(c.grass2),   cv), smoothstep(sea.add(0.035), sea.add(0.06), elevation)))
-    col.assign(mix(col, mix(color(c.forest),  color(c.forest2),  cv), smoothstep(sea.add(0.06), sea.add(0.10), elevation)))
-    col.assign(mix(col, mix(color(c.rock),    color(c.rock2),    cv), smoothstep(sea.add(0.10), sea.add(0.16), elevation)))
-    col.assign(mix(col, mix(color(c.snow),    color(c.snowDirty), cv), smoothstep(sea.add(0.16), sea.add(0.22), elevation)))
+    const col = vec3(uniforms.deepOcean).toVar()
+    col.assign(mix(col, vec3(uniforms.midOcean),     smoothstep(sea.sub(0.15), sea.sub(0.06), elevation)))
+    col.assign(mix(col, vec3(uniforms.shallowWater), smoothstep(sea.sub(0.06), sea.sub(0.02), elevation)))
+    col.assign(mix(col, vec3(uniforms.coast),        smoothstep(sea.sub(0.02), sea, elevation)))
+    col.assign(mix(col, mix(vec3(uniforms.sand),    vec3(uniforms.sand2),    cv), smoothstep(sea, sea.add(0.01), elevation)))
+    col.assign(mix(col, mix(vec3(uniforms.savanna), vec3(uniforms.savanna2), cv), smoothstep(sea.add(0.01), sea.add(0.035), elevation)))
+    col.assign(mix(col, mix(vec3(uniforms.grass),   vec3(uniforms.grass2),   cv), smoothstep(sea.add(0.035), sea.add(0.06), elevation)))
+    col.assign(mix(col, mix(vec3(uniforms.forest),  vec3(uniforms.forest2),  cv), smoothstep(sea.add(0.06), sea.add(0.10), elevation)))
+    col.assign(mix(col, mix(vec3(uniforms.rock),    vec3(uniforms.rock2),    cv), smoothstep(sea.add(0.10), sea.add(0.16), elevation)))
+    col.assign(mix(col, mix(vec3(uniforms.snow),    vec3(uniforms.snowDirty), cv), smoothstep(sea.add(0.16), sea.add(0.22), elevation)))
 
-    // Darken surface under clouds
     const cloudMask = getCloudShadow(pos)
     col.assign(col.mul(float(1.0).sub(cloudMask.mul(uniforms.cloudShadow))))
 

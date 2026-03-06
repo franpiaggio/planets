@@ -107,6 +107,7 @@ declare module 'three/addons/controls/OrbitControls.js' {
     constructor(camera: Camera, domElement: HTMLElement)
     enableDamping: boolean
     dampingFactor: number
+    enablePan: boolean
     minDistance: number
     maxDistance: number
     update(): void

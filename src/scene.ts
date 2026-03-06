@@ -15,6 +15,8 @@ import { createAtmosphereMaterial, applyInnerGlow } from './shaders/atmosphere'
 import { createCloudMaterial } from './shaders/clouds'
 import { setupGui } from './gui'
 import { createStarfield } from './stars'
+import { PALETTES } from './palettes'
+import type { PlanetPalette } from './palettes'
 
 // ---------------------------------------------------------------------------
 // Scene state
@@ -31,6 +33,7 @@ let clouds: Mesh
 let atmosphere: Mesh
 let planetUniforms: ReturnType<typeof createPlanetMaterial>['uniforms']
 let cloudUniformsRef: ReturnType<typeof createCloudMaterial>['uniforms']
+let atmosUniformsRef: ReturnType<typeof createAtmosphereMaterial>['uniforms']
 
 // ---------------------------------------------------------------------------
 // Post-processing state
@@ -108,16 +111,37 @@ export function toggleEffect(name: string, enabled: boolean) {
 // UI
 // ---------------------------------------------------------------------------
 
-function createRandomizeButton(uniforms: typeof planetUniforms) {
+function applyPalette(palette: PlanetPalette) {
+  const b = palette.biome
+  const biomeKeys = [
+    'deepOcean', 'midOcean', 'shallowWater', 'coast',
+    'sand', 'sand2', 'savanna', 'savanna2',
+    'grass', 'grass2', 'forest', 'forest2',
+    'rock', 'rock2', 'snow', 'snowDirty',
+  ] as const
+
+  for (const key of biomeKeys) {
+    (planetUniforms as any)[key].value.set(b[key])
+  }
+
+  planetUniforms.seaLevel.value = palette.seaLevel
+  atmosUniformsRef.atmosphereColor.value.set(palette.atmosphere)
+  atmosUniformsRef.twilightColor.value.set(palette.twilight)
+  cloudUniformsRef.cloudColor.value.set(palette.cloud)
+}
+
+function createRandomizeButton() {
   const btn = document.createElement('button')
   btn.textContent = 'Randomize'
   btn.className = 'randomize-btn'
   btn.addEventListener('click', () => {
-    uniforms.seed.value.set(
+    planetUniforms.seed.value.set(
       Math.random() * 100 - 50,
       Math.random() * 100 - 50,
       Math.random() * 100 - 50
     )
+    const palette = PALETTES[Math.floor(Math.random() * PALETTES.length)]
+    applyPalette(palette)
   })
   document.body.appendChild(btn)
 }
@@ -161,11 +185,12 @@ export async function init() {
   controls = new OrbitControls(camera, renderer.domElement)
   controls.enableDamping = true
   controls.dampingFactor = 0.05
+  controls.enablePan = false
   controls.minDistance = 2
-  controls.maxDistance = 10
+  controls.maxDistance = 12
 
   // Lighting
-  const sun = new DirectionalLight(0xffffff, 2.0)
+  const sun = new DirectionalLight(0xffffff, 1.8)
   sun.position.set(5, 3, 5)
   scene.add(sun)
   scene.add(new AmbientLight(0x404060, 0.3))
@@ -181,6 +206,7 @@ export async function init() {
 
   // Atmosphere
   const { material: atmosMat, uniforms: atmosUniforms } = createAtmosphereMaterial(planetUniforms)
+  atmosUniformsRef = atmosUniforms
 
   // Clouds
   const { material: cloudMat, uniforms: cloudUniforms } = createCloudMaterial(planetUniforms, atmosUniforms)
@@ -197,7 +223,7 @@ export async function init() {
   }
 
   // Randomize button
-  createRandomizeButton(planetUniforms)
+  createRandomizeButton()
 
   window.addEventListener('resize', onResize)
   renderer.setAnimationLoop(animate)
