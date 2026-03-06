@@ -10,7 +10,7 @@ declare module 'three/webgpu' {
   export {
     Scene, PerspectiveCamera, Color, Vector3, Vector2,
     SphereGeometry, BufferGeometry, PlaneGeometry, BoxGeometry,
-    Mesh, Points, Group, Object3D, Material,
+    Mesh, Points, Group, Object3D, Material, Sprite,
     BackSide, FrontSide, DoubleSide, AdditiveBlending,
     RepeatWrapping, ClampToEdgeWrapping, SRGBColorSpace,
     Float32BufferAttribute, BufferAttribute,
@@ -40,8 +40,11 @@ declare module 'three/webgpu' {
   export class MeshBasicNodeMaterial extends THREE.Material {
     colorNode: any
     opacityNode: any
+    map: THREE.Texture | null
     transparent: boolean
     depthWrite: boolean
+    depthTest: boolean
+    fog: boolean
     side: THREE.Side
     blending: THREE.Blending
   }
@@ -64,6 +67,11 @@ declare module 'three/webgpu' {
     sizeNode: any
     sizeAttenuation: boolean
     vertexColors: boolean
+  }
+
+  export class SpriteNodeMaterial extends THREE.Material {
+    colorNode: any
+    opacityNode: any
   }
 }
 
@@ -108,9 +116,12 @@ declare module 'three/addons/controls/OrbitControls.js' {
     enableDamping: boolean
     dampingFactor: number
     enablePan: boolean
+    rotateSpeed: number
+    zoomSpeed: number
     minDistance: number
     maxDistance: number
     update(): void
     dispose(): void
   }
 }
+

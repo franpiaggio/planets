@@ -17,6 +17,7 @@ import { setupGui, refreshGui } from './gui'
 import { createStarfield } from './stars'
 import { PALETTES } from './palettes'
 import type { PlanetPalette } from './palettes'
+import { createSunFlare } from './lensflare'
 
 // ---------------------------------------------------------------------------
 // Scene state
@@ -29,6 +30,8 @@ let postProcessing: PostProcessing
 let controls: OrbitControls
 let stats: Stats
 let planetGroup: Group
+let sun: DirectionalLight
+let sunFlare: any
 let planet: Mesh
 let clouds: Mesh
 let atmosphere: Mesh
@@ -170,13 +173,21 @@ function randomizePlanet() {
   const deformZ = 1.0 + (Math.random() - 0.5) * 0.12
   planetGroup.scale.set(baseScale * deformX, baseScale * deformY, baseScale * deformZ)
 
-  // Random clouds/atmosphere visibility
-  clouds.visible = Math.random() > 0.25        // 75% have clouds
-  atmosphere.visible = Math.random() > 0.15    // 85% have atmosphere
+  // Always show atmosphere and clouds
+  atmosphere.visible = true
+  clouds.visible = true
 
-  // Axial tilt (radians, ±25°)
-  planetGroup.rotation.x = (Math.random() - 0.5) * 0.87
-  planetGroup.rotation.z = (Math.random() - 0.5) * 0.87
+  // Axial tilt — only Z axis (side lean), never flipping toward/away from camera
+  planetGroup.rotation.x = 0
+  planetGroup.rotation.z = (Math.random() - 0.5) * 0.52                    // ±15°
+
+  // Sun direction — always from camera side, vary left/right
+  const sunAngle = (Math.random() - 0.5) * Math.PI * 0.8                   // ±72° from center
+  const sunY = 0.2 + (Math.random() - 0.5) * 0.3                           // 0.05–0.35, never top/bottom
+  const sunDir = new Vector3(Math.cos(sunAngle) * 5, sunY * 5, Math.sin(sunAngle) * 5)
+  sun.position.copy(sunDir)
+  planetUniforms.sunDirection.value.copy(sunDir).normalize()
+  sunFlare.position.copy(planetUniforms.sunDirection.value).multiplyScalar(30)
 
   // Sync GUI if active
   refreshGui()
@@ -236,10 +247,15 @@ export async function init() {
   controls.maxDistance = 12
 
   // Lighting
-  const sun = new DirectionalLight(0xffffff, 1.8)
+  sun = new DirectionalLight(0xffffff, 1.8)
   sun.position.set(5, 3, 5)
   scene.add(sun)
   scene.add(new AmbientLight(0x404060, 0.3))
+
+  // Lens flare — placed far in the sun direction
+  sunFlare = createSunFlare()
+  sunFlare.position.copy(new Vector3().copy(sun.position).normalize().multiplyScalar(30))
+  scene.add(sunFlare)
 
   // Stars
   scene.add(createStarfield())
@@ -283,14 +299,16 @@ export async function init() {
 // ---------------------------------------------------------------------------
 
 function animate() {
-  planet.rotation.y += 0.002
-  clouds.rotation.y += 0.003
-  atmosphere.rotation.y += 0.002
+  planet.rotation.y += 0.00067
+  clouds.rotation.y += 0.001
+  atmosphere.rotation.y += 0.00067
 
   planetUniforms.cloudRotationY.value = clouds.rotation.y - planet.rotation.y
   cloudUniformsRef.uTime.value += 0.016
 
   controls.update()
+  const glowBillboard = sunFlare.getObjectByName('sunGlow')
+  if (glowBillboard) glowBillboard.lookAt(camera.position)
   if (dofFocusUniform) dofFocusUniform.value = camera.position.length()
   postProcessing.render()
 

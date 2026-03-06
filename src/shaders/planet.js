@@ -139,7 +139,7 @@ export function createPlanetMaterial() {
     const elevation = getElevation(positionLocal)
     const sea = uniforms.seaLevel
 
-    const r = float(0.55).toVar()
+    const r = float(0.8).toVar()
     r.assign(mix(r, float(0.75), smoothstep(sea, sea.add(0.01), elevation)))
     r.assign(mix(r, float(0.9),  smoothstep(sea.add(0.10), sea.add(0.16), elevation)))
     r.assign(mix(r, float(0.6),  smoothstep(sea.add(0.16), sea.add(0.22), elevation)))
