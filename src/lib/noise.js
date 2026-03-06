@@ -212,23 +212,11 @@ const simplexNoise3D = Fn(([p]) => {
 // Single-type exports for cheap detail layers (1/5 cost of sampleNoise)
 export { gradientNoise3D, voronoiNoise3D, ridgedNoise3D }
 
-// Type 0 = Value, 1 = Gradient, 2 = Simplex, 3 = Voronoi, 4 = Ridged
+// Type 1 = Gradient (Perlin), 2 = Simplex
 export const sampleNoise = Fn(([p, noiseType]) => {
-  const result = float(0.0).toVar()
-
-  // Evaluate all and select — GPU-friendly (no branching)
-  const v = valueNoise3D(p)
   const g = gradientNoise3D(p)
   const s = simplexNoise3D(p)
-  const w = voronoiNoise3D(p)
-  const r = ridgedNoise3D(p)
-
-  result.assign(mix(v, g, smoothstep(0.5, 1.5, noiseType)))
-  result.assign(mix(result, s, smoothstep(1.5, 2.5, noiseType)))
-  result.assign(mix(result, w, smoothstep(2.5, 3.5, noiseType)))
-  result.assign(mix(result, r, smoothstep(3.5, 4.5, noiseType)))
-
-  return result
+  return mix(g, s, smoothstep(1.5, 2.5, noiseType))
 })
 
 // ============================================
@@ -256,11 +244,6 @@ export const fbm = Fn(([p, noiseType, octaves, lacunarity, gain]) => {
   amplitude.mulAssign(gain)
 
   // Octave 4
-  value.addAssign(sampleNoise(pos, noiseType).mul(amplitude))
-  pos.mulAssign(lacunarity)
-  amplitude.mulAssign(gain)
-
-  // Octave 5
   value.addAssign(sampleNoise(pos, noiseType).mul(amplitude))
 
   return value

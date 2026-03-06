@@ -37,7 +37,7 @@ export function createPlanetMaterial() {
 
   const getElevation = Fn(([pos]) => {
     const wp = warpedPos(pos)
-    const base = fbm(wp, uniforms.noiseType, float(5), uniforms.lacunarity, uniforms.gain)
+    const base = fbm(wp, uniforms.noiseType, float(4), uniforms.lacunarity, uniforms.gain)
 
     // Sharp unwarped detail only on high terrain (mountains get definition)
     const highMask = smoothstep(uniforms.seaLevel.add(0.04), uniforms.seaLevel.add(0.12), base)
@@ -64,10 +64,9 @@ export function createPlanetMaterial() {
     const pos = positionLocal
     const elevation = getElevation(pos)
 
-    // Color variation at two frequencies
+    // Color variation
     const wp = warpedPos(pos)
     const colorVar = gradientNoise3D(wp.mul(3.0))
-    const fineVar = gradientNoise3D(wp.mul(9.0))
 
     // Earth-based color palette
     const deepOcean    = color(0x0a1e3d)
@@ -88,7 +87,7 @@ export function createPlanetMaterial() {
     const snowDirty    = color(0xc8c0b8)
 
     const sea = uniforms.seaLevel
-    const cv = colorVar.mul(0.6).add(fineVar.mul(0.4))
+    const cv = colorVar
 
     const col = vec3(deepOcean).toVar()
     col.assign(mix(col, midOcean,     smoothstep(sea.sub(0.15), sea.sub(0.06), elevation)))
@@ -127,8 +126,11 @@ export function createPlanetMaterial() {
     const cw1y = gradientNoise3D(cScaled.add(vec3(2.3, 8.1, 0.7))).sub(0.5)
     const cw1z = gradientNoise3D(cScaled.add(vec3(5.7, 3.1, 9.0))).sub(0.5)
     const cwp = cScaled.add(vec3(cw1x, cw1y, cw1z).mul(uniforms.warpStrength.mul(0.6)))
-    const cloudNoise = fbm(cwp, float(1), float(4), float(2.2), float(0.5))
-    const cloudMask = smoothstep(float(0.48), float(0.58), cloudNoise)
+    // Lightweight 3-octave FBM using gradientNoise3D directly (skip sampleNoise)
+    const cn = gradientNoise3D(cwp).mul(0.5)
+      .add(gradientNoise3D(cwp.mul(2.2)).mul(0.25))
+      .add(gradientNoise3D(cwp.mul(4.84)).mul(0.125))
+    const cloudMask = smoothstep(float(0.48), float(0.58), cn)
     // Darken surface under clouds
     col.assign(col.mul(float(1.0).sub(cloudMask.mul(uniforms.cloudShadow))))
 

@@ -154,7 +154,7 @@ export async function init() {
   // Planet
   const planetResult = createPlanetMaterial()
   planetUniforms = planetResult.uniforms
-  planet = new Mesh(new SphereGeometry(1, 128, 128), planetResult.material)
+  planet = new Mesh(new SphereGeometry(1, 96, 96), planetResult.material)
   scene.add(planet)
 
   // Atmosphere

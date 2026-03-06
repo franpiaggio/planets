@@ -4,7 +4,7 @@ import {
   positionLocal, normalWorld,
   normalize, dot, smoothstep, mix
 } from 'three/tsl'
-import { fbm, gradientNoise3D } from '../lib/noise'
+import { gradientNoise3D } from '../lib/noise'
 
 export function createCloudMaterial(planetUniforms, atmosUniforms) {
   const uniforms = {
@@ -15,6 +15,13 @@ export function createCloudMaterial(planetUniforms, atmosUniforms) {
     cloudColor: uniform(new Color(0xffffff)),
     surfaceTint: uniform(0.1),
   }
+
+  // Lightweight 3-octave FBM using gradientNoise3D directly
+  const cloudFbm = Fn(([p]) => {
+    return gradientNoise3D(p).mul(0.5)
+      .add(gradientNoise3D(p.mul(2.2)).mul(0.25))
+      .add(gradientNoise3D(p.mul(4.84)).mul(0.125))
+  })
 
   // Domain warping for clouds — same technique as terrain, different offsets
   const warpedCloudPos = Fn(([pos]) => {
@@ -27,47 +34,37 @@ export function createCloudMaterial(planetUniforms, atmosUniforms) {
     return scaled.add(vec3(warp1x, warp1y, warp1z).mul(planetUniforms.warpStrength.mul(0.6)))
   })
 
-  const material = new MeshBasicNodeMaterial()
-
-  material.colorNode = Fn(() => {
-    const pos = positionLocal
-
-    // Cloud shape with domain warping
+  // Shared cloud shape computation
+  const getCloudShape = Fn(([pos]) => {
     const wp = warpedCloudPos(pos)
-    const noise = fbm(wp, float(1), float(4), float(2.2), float(0.5))
-    const cloud = smoothstep(
+    const noise = cloudFbm(wp)
+    return smoothstep(
       uniforms.cloudDensity,
       uniforms.cloudDensity.add(float(1.0).div(uniforms.cloudSharpness)),
       noise
     )
+  })
+
+  const material = new MeshBasicNodeMaterial()
+
+  material.colorNode = Fn(() => {
+    const pos = positionLocal
+    const cloud = getCloudShape(pos)
 
     // Sun shading — hide clouds on night side
     const sunDot = dot(normalWorld, normalize(planetUniforms.sunDirection))
     const dayMask = smoothstep(-0.1, 0.2, sunDot)
     const shade = smoothstep(-0.5, 0.8, sunDot).mul(0.4).add(0.6)
 
-    // Subtle surface reflection: warm (land) vs cool (ocean)
-    const surfaceNoise = gradientNoise3D(pos.mul(2.5))
-    const warmTint = vec3(1.0, 0.96, 0.9)
-    const coolTint = vec3(0.9, 0.95, 1.0)
-    const surfaceColor = mix(coolTint, warmTint, surfaceNoise)
-
     // Atmosphere bleed at thin edges
     const edgeFade = smoothstep(0.7, 0.2, cloud)
     const atmosTint = mix(vec3(1.0, 1.0, 1.0), vec3(atmosUniforms.atmosphereColor), edgeFade.mul(0.12))
 
-    const tintedCloud = mix(uniforms.cloudColor, surfaceColor, uniforms.surfaceTint)
-    return tintedCloud.mul(atmosTint).mul(shade).mul(cloud).mul(dayMask)
+    return vec3(uniforms.cloudColor).mul(atmosTint).mul(shade).mul(cloud).mul(dayMask)
   })()
 
   material.opacityNode = Fn(() => {
-    const wp = warpedCloudPos(positionLocal)
-    const noise = fbm(wp, float(1), float(4), float(2.2), float(0.5))
-    const cloud = smoothstep(
-      uniforms.cloudDensity,
-      uniforms.cloudDensity.add(float(1.0).div(uniforms.cloudSharpness)),
-      noise
-    )
+    const cloud = getCloudShape(positionLocal)
     const sunDot = dot(normalWorld, normalize(planetUniforms.sunDirection))
     const dayMask = smoothstep(-0.1, 0.2, sunDot)
     return cloud.mul(uniforms.cloudOpacity).mul(dayMask)
