@@ -124,7 +124,7 @@ function applyPalette(palette: PlanetPalette) {
     (planetUniforms as any)[key].value.set(b[key])
   }
 
-  planetUniforms.seaLevel.value = palette.seaLevel
+  planetUniforms.seaLevel.value = palette.seaLevel + (Math.random() - 0.5) * 0.08
   atmosUniformsRef.atmosphereColor.value.set(palette.atmosphere)
   atmosUniformsRef.twilightColor.value.set(palette.twilight)
   cloudUniformsRef.cloudColor.value.set(palette.cloud)
@@ -142,20 +142,20 @@ function randomizePlanet() {
   const palette = PALETTES[Math.floor(Math.random() * PALETTES.length)]
   applyPalette(palette)
 
-  // Noise params
+  // Subtle noise variation around defaults
   const types = [1, 2]
   planetUniforms.noiseType.value = types[Math.floor(Math.random() * types.length)]
-  planetUniforms.noiseScale.value = 1.5 + Math.random() * 3.5
-  planetUniforms.lacunarity.value = 1.5 + Math.random() * 1.5
-  planetUniforms.gain.value = 0.2 + Math.random() * 0.5
-  planetUniforms.terrainHeight.value = 0.1 + Math.random() * 0.8
-  planetUniforms.warpStrength.value = 0.1 + Math.random() * 1.5
+  planetUniforms.noiseScale.value = 2.2 + (Math.random() - 0.5) * 1.0       // 1.7–2.7
+  planetUniforms.lacunarity.value = 2.2 + (Math.random() - 0.5) * 0.6       // 1.9–2.5
+  planetUniforms.gain.value = 0.45 + (Math.random() - 0.5) * 0.2            // 0.35–0.55
+  planetUniforms.terrainHeight.value = 0.45 + (Math.random() - 0.5) * 0.3   // 0.3–0.6
+  planetUniforms.warpStrength.value = 0.55 + (Math.random() - 0.5) * 0.4    // 0.35–0.75
 
-  // Clouds
-  cloudUniformsRef.cloudScale.value = 2.0 + Math.random() * 5.0
-  cloudUniformsRef.cloudDensity.value = 0.3 + Math.random() * 0.4
-  cloudUniformsRef.cloudSharpness.value = 1.5 + Math.random() * 6.0
-  cloudUniformsRef.cloudOpacity.value = 0.2 + Math.random() * 0.5
+  // Subtle cloud variation
+  cloudUniformsRef.cloudScale.value = 3.0 + (Math.random() - 0.5) * 2.0     // 2.0–4.0
+  cloudUniformsRef.cloudDensity.value = 0.48 + (Math.random() - 0.5) * 0.15 // 0.4–0.56
+  cloudUniformsRef.cloudSharpness.value = 3.0 + (Math.random() - 0.5) * 2.0 // 2.0–4.0
+  cloudUniformsRef.cloudOpacity.value = 0.45 + (Math.random() - 0.5) * 0.2  // 0.35–0.55
 
   // Sync GUI if active
   refreshGui()
@@ -209,6 +209,8 @@ export async function init() {
   controls.enableDamping = true
   controls.dampingFactor = 0.05
   controls.enablePan = false
+  controls.rotateSpeed = 0.5
+  controls.zoomSpeed = 0.5
   controls.minDistance = 2
   controls.maxDistance = 12
 
