@@ -3,7 +3,7 @@ import {
 } from 'three/webgpu'
 import { attribute } from 'three/tsl'
 
-export function createStarfield(count = 14000, radius = 50) {
+export function createStarfield(count = 8000, radius = 50) {
   const positions = new Float32Array(count * 3)
   const sizes = new Float32Array(count)
   const colors = new Float32Array(count * 3)
@@ -17,15 +17,15 @@ export function createStarfield(count = 14000, radius = 50) {
     positions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta)
     positions[i * 3 + 2] = r * Math.cos(phi)
 
-    // Size distribution — more stars in the visible range
+    // Size distribution — small and varied
     const r2 = Math.random()
     let size: number
-    if (r2 > 0.998) size = 7.0 + Math.random() * 4.0          // rare beacons
-    else if (r2 > 0.992) size = 4.5 + Math.random() * 2.5     // bright
-    else if (r2 > 0.96) size = 3.0 + Math.random() * 1.5      // notable
-    else if (r2 > 0.80) size = 1.8 + Math.random() * 1.2      // medium
-    else if (r2 > 0.40) size = 1.0 + Math.random() * 0.8      // small but visible
-    else size = 0.5 + Math.random() * 0.5                      // faint
+    if (r2 > 0.999) size = 4.0 + Math.random() * 2.0          // rare bright
+    else if (r2 > 0.995) size = 2.5 + Math.random() * 1.5     // notable
+    else if (r2 > 0.97) size = 1.5 + Math.random() * 1.0      // medium
+    else if (r2 > 0.80) size = 0.8 + Math.random() * 0.7      // small
+    else if (r2 > 0.40) size = 0.4 + Math.random() * 0.4      // tiny
+    else size = 0.2 + Math.random() * 0.2                      // faint dust
     sizes[i] = size
 
     // Color temperature — realistic stellar classes
@@ -58,13 +58,13 @@ export function createStarfield(count = 14000, radius = 50) {
       cb = w + tint * (Math.random() - 0.5)
     }
 
-    // Brightness curve — keep faint stars more visible
+    // Brightness curve
     let brightness: number
-    if (size >= 4.5) brightness = 0.9 + Math.random() * 0.1
-    else if (size >= 3.0) brightness = 0.7 + Math.random() * 0.2
-    else if (size >= 1.8) brightness = 0.5 + Math.random() * 0.2
-    else if (size >= 1.0) brightness = 0.35 + Math.random() * 0.15
-    else brightness = 0.2 + Math.random() * 0.15
+    if (size >= 2.5) brightness = 0.85 + Math.random() * 0.15
+    else if (size >= 1.5) brightness = 0.6 + Math.random() * 0.2
+    else if (size >= 0.8) brightness = 0.4 + Math.random() * 0.2
+    else if (size >= 0.4) brightness = 0.25 + Math.random() * 0.15
+    else brightness = 0.15 + Math.random() * 0.1
 
     colors[i * 3] = cr * brightness
     colors[i * 3 + 1] = cg * brightness

@@ -86,7 +86,7 @@ function initPasses() {
   const scenePassViewZ = scenePass.getViewZNode()
   dofFocusUniform = uniform(7.0)
   dofApertureUniform = uniform(0.0008)
-  dofMaxblurUniform = uniform(0.006)
+  dofMaxblurUniform = uniform(0.002)
   passes.dof = dof(scenePassColor, scenePassViewZ, dofFocusUniform, dofApertureUniform, dofMaxblurUniform)
   rawNodes.dof = { focus: dofFocusUniform, aperture: dofApertureUniform, maxblur: dofMaxblurUniform }
 
