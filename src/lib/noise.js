@@ -1,7 +1,7 @@
 import {
   Fn, float, vec3,
   abs, mix, clamp, smoothstep,
-  mx_noise_float
+  mx_noise_float, mx_worley_noise_float
 } from 'three/tsl'
 
 // ---------------------------------------------------------------------------
@@ -19,6 +19,23 @@ export const noise3D = Fn(([p]) => {
 
 // Keep this alias for backward compatibility with clouds.js, atmosphere.js, rings.js
 export const gradientNoise3D = noise3D
+
+// ---------------------------------------------------------------------------
+// Worley (Voronoi) noise — cellular patterns
+// mx_worley_noise_float(pos, jitter, metric)
+// jitter: cell randomness (0=grid, 1=full), metric: 0=Euclidean
+// Returns distance to nearest cell center ~[0, 1]
+// ---------------------------------------------------------------------------
+
+export const worley3D = Fn(([p]) => {
+  return mx_worley_noise_float(p, 1.0, 0)
+})
+
+// Inverted Worley — bright at cell edges, dark at centers
+// Good for cracks, veins, terrain texture
+export const worleyEdge3D = Fn(([p]) => {
+  return float(1.0).sub(mx_worley_noise_float(p, 1.0, 0))
+})
 
 // ---------------------------------------------------------------------------
 // Standard FBM — 6 octaves, unrolled

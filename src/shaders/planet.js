@@ -1,10 +1,10 @@
 import { Vector3, Color, MeshStandardNodeMaterial } from 'three/webgpu'
 import {
   Fn, float, vec3, uniform,
-  positionLocal, normalLocal,
-  mix, smoothstep, cos, sin, abs
+  positionLocal, normalLocal, normalView,
+  mix, smoothstep, cos, sin, abs, max, cross, normalize
 } from 'three/tsl'
-import { noise3D, fbm, ridgedFbm, erosionFbm } from '../lib/noise'
+import { noise3D, fbm, ridgedFbm, erosionFbm, worley3D, worleyEdge3D } from '../lib/noise'
 import { PALETTES } from '../palettes'
 
 // Planet categories
@@ -45,7 +45,7 @@ export function createPlanetMaterial() {
   const uniforms = {
     planetCategory: uniform(CATEGORY_ROCKY), // 1=rocky, 2=gas, 3=liquid
     noiseScale: uniform(2.2),
-    lacunarity: uniform(1.92),     // slightly below 2.0 to avoid lattice alignment
+    lacunarity: uniform(2.05),     // higher = more visible multi-scale detail
     gain: uniform(0.45),
     terrainHeight: uniform(0.15),
     seaLevel: uniform(defaultPalette.seaLevel),
@@ -53,6 +53,11 @@ export function createPlanetMaterial() {
     ridgeStrength: uniform(0.12),  // how prominent ridged mountains are on land
     erosionStrength: uniform(0.0), // 0=smooth standard, 1=full erosion (flat valleys, rough peaks)
     sunDirection: uniform(new Vector3(1, 0.3, 0.5).normalize()),
+    moistureScale: uniform(1.8),       // frequency of moisture noise field
+    moistureOffset: uniform(new Vector3(42.3, 17.1, 88.7)), // offset so moisture is independent of terrain
+    bumpStrength: uniform(0.6),       // procedural normal perturbation strength
+    terrainPower: uniform(1.5),       // power redistribution: >1 = flatter valleys, sharper peaks
+    worleyBlend: uniform(0.15),       // how much Worley pattern mixes into coloring
     cloudRotationY: uniform(0.0),
     cloudShadow: uniform(0.3),
     seed: uniform(new Vector3(0, 0, 0)),
@@ -97,7 +102,9 @@ export function createPlanetMaterial() {
     const highMask = smoothstep(sea.add(0.04), sea.add(0.12), continent)
     const detail = noise3D(pos.add(uniforms.seed).mul(uniforms.noiseScale.mul(4.0))).sub(0.5).mul(0.04)
 
-    return continent.add(ridges.mul(uniforms.ridgeStrength).mul(landMask)).add(detail.mul(highMask))
+    const raw = continent.add(ridges.mul(uniforms.ridgeStrength).mul(landMask)).add(detail.mul(highMask))
+    // Power redistribution — flattens valleys, sharpens peaks
+    return raw.pow(uniforms.terrainPower)
   })
 
   // Cloud shadow sampling (matches cloud shader warp offsets)
@@ -137,23 +144,52 @@ export function createPlanetMaterial() {
     return pos.add(normalLocal.mul(landHeight.mul(uniforms.terrainHeight).mul(isRocky)))
   })()
 
+  // Moisture field — independent noise for biome variation (single octave, cheap)
+  const getMoisture = Fn(([pos]) => {
+    const mp = pos.add(uniforms.seed).add(uniforms.moistureOffset).mul(uniforms.moistureScale)
+    // 2 octaves inline — cheaper than full fbm
+    const m1 = noise3D(mp)
+    const m2 = noise3D(mp.mul(2.1)).mul(0.5)
+    return m1.mul(0.67).add(m2.mul(0.33))
+  })
+
   // --- Rocky biome coloring ---
   const getRockyColor = Fn(([pos]) => {
     const elevation = getElevation(pos)
     const sea = uniforms.seaLevel
-    const cv = noise3D(warpedPos(pos).mul(3.0))
+    const wp = warpedPos(pos)
 
+    // Color variation: blend Perlin + Worley for richer texture
+    const cv = noise3D(wp.mul(3.0))
+    const wv = worley3D(wp.mul(4.0))             // cellular texture (single call)
+    const we = float(1.0).sub(wv)                // edge pattern derived from same call (free)
+    const texVar = mix(cv, wv, uniforms.worleyBlend)
+    const moisture = getMoisture(pos)
+
+    // Perturbed biome boundaries
+    const bn = noise3D(wp.mul(5.0)).sub(0.5).mul(0.008)
+
+    // Ocean layers — add Worley for depth variation
     const col = vec3(uniforms.deepOcean).toVar()
     col.assign(mix(col, vec3(uniforms.midOcean),     smoothstep(sea.sub(0.15), sea.sub(0.06), elevation)))
     col.assign(mix(col, vec3(uniforms.shallowWater), smoothstep(sea.sub(0.06), sea.sub(0.02), elevation)))
     col.assign(mix(col, vec3(uniforms.coast),        smoothstep(sea.sub(0.02), sea, elevation)))
-    col.assign(mix(col, mix(vec3(uniforms.sand),    vec3(uniforms.sand2),    cv), smoothstep(sea, sea.add(0.01), elevation)))
-    col.assign(mix(col, mix(vec3(uniforms.savanna), vec3(uniforms.savanna2), cv), smoothstep(sea.add(0.01), sea.add(0.035), elevation)))
-    col.assign(mix(col, mix(vec3(uniforms.grass),   vec3(uniforms.grass2),   cv), smoothstep(sea.add(0.035), sea.add(0.06), elevation)))
-    col.assign(mix(col, mix(vec3(uniforms.forest),  vec3(uniforms.forest2),  cv), smoothstep(sea.add(0.06), sea.add(0.10), elevation)))
-    col.assign(mix(col, mix(vec3(uniforms.rock),    vec3(uniforms.rock2),    cv), smoothstep(sea.add(0.10), sea.add(0.16), elevation)))
-    col.assign(mix(col, mix(vec3(uniforms.snow),    vec3(uniforms.snowDirty), cv), smoothstep(sea.add(0.16), sea.add(0.22), elevation)))
 
+    // Land biomes — moisture blends variants, Worley adds texture
+    const moist = smoothstep(0.35, 0.6, moisture)
+    col.assign(mix(col, mix(vec3(uniforms.sand),    vec3(uniforms.sand2),    mix(texVar, moist, 0.35)), smoothstep(sea.add(bn), sea.add(float(0.01).add(bn)), elevation)))
+    col.assign(mix(col, mix(vec3(uniforms.savanna), vec3(uniforms.savanna2), mix(texVar, moist, 0.35)), smoothstep(sea.add(float(0.01).add(bn)), sea.add(float(0.035).add(bn)), elevation)))
+    col.assign(mix(col, mix(vec3(uniforms.grass),   vec3(uniforms.grass2),   mix(texVar, moist, 0.35)), smoothstep(sea.add(float(0.035).add(bn)), sea.add(float(0.06).add(bn)), elevation)))
+    col.assign(mix(col, mix(vec3(uniforms.forest),  vec3(uniforms.forest2),  mix(texVar, moist, 0.35)), smoothstep(sea.add(float(0.06).add(bn)),  sea.add(float(0.10).add(bn)), elevation)))
+    col.assign(mix(col, mix(vec3(uniforms.rock),    vec3(uniforms.rock2),    texVar), smoothstep(sea.add(float(0.10).add(bn)), sea.add(float(0.16).add(bn)), elevation)))
+    col.assign(mix(col, mix(vec3(uniforms.snow),    vec3(uniforms.snowDirty), texVar), smoothstep(sea.add(float(0.16).add(bn)), sea.add(float(0.22).add(bn)), elevation)))
+
+    // Worley edge darkening on land — gives rocky/cracked texture
+    const landMask = smoothstep(sea, sea.add(0.02), elevation)
+    const edgeDarken = we.mul(0.12).mul(landMask).mul(uniforms.worleyBlend.mul(3.0))
+    col.assign(col.mul(float(1.0).sub(edgeDarken)))
+
+    // Cloud shadow
     const cloudMask = getCloudShadow(pos)
     col.assign(col.mul(float(1.0).sub(cloudMask.mul(uniforms.cloudShadow))))
     return col
@@ -224,25 +260,41 @@ export function createPlanetMaterial() {
     return col
   })()
 
-  // Roughness per category
+  // Roughness per category — no elevation sampling to save performance
   material.roughnessNode = Fn(() => {
     const cat = uniforms.planetCategory
-
-    // Rocky: varies by elevation
-    const elevation = getElevation(positionLocal)
-    const sea = uniforms.seaLevel
-    const rockyR = float(0.8).toVar()
-    rockyR.assign(mix(rockyR, float(0.75), smoothstep(sea, sea.add(0.01), elevation)))
-    rockyR.assign(mix(rockyR, float(0.9),  smoothstep(sea.add(0.10), sea.add(0.16), elevation)))
-    rockyR.assign(mix(rockyR, float(0.6),  smoothstep(sea.add(0.16), sea.add(0.22), elevation)))
-
-    // Gas: matte (0.85), Liquid: slightly glossy (0.7)
-    const r = mix(rockyR, float(0.85), smoothstep(1.5, 2.0, cat)).toVar()
+    // Rocky: 0.78 (decent middle ground), Gas: matte (0.85), Liquid: slightly glossy (0.7)
+    const r = mix(float(0.78), float(0.85), smoothstep(1.5, 2.0, cat)).toVar()
     r.assign(mix(r, float(0.7), smoothstep(2.5, 3.0, cat)))
     return r
   })()
 
   material.metalnessNode = float(0.0)
+
+  // Procedural normal perturbation — gives surface detail to lighting
+  // Uses finite differences on a single noise layer (cheap: only 2 extra samples)
+  const BUMP_EPS = 0.004
+  material.normalNode = Fn(() => {
+    const pos = positionLocal
+    const cat = uniforms.planetCategory
+    const isRocky = smoothstep(1.0, 1.5, cat).oneMinus()
+
+    // Perlin-only bump — cheap, Worley texture comes from coloring
+    const sp = pos.add(uniforms.seed).mul(uniforms.noiseScale.mul(2.5))
+    const n0 = noise3D(sp)
+    const nx = noise3D(sp.add(vec3(BUMP_EPS, 0, 0)))
+    const nz = noise3D(sp.add(vec3(0, 0, BUMP_EPS)))
+
+    const dx = nx.sub(n0).div(BUMP_EPS)
+    const dz = nz.sub(n0).div(BUMP_EPS)
+
+    // Perturb normal in view space
+    const bumpScale = uniforms.bumpStrength.mul(uniforms.terrainHeight).mul(isRocky)
+    const nv = normalView
+    const t = normalize(cross(vec3(0.0, 1.0, 0.0), nv))
+    const b = normalize(cross(nv, t))
+    return normalize(nv.sub(t.mul(dx.mul(bumpScale))).sub(b.mul(dz.mul(bumpScale))))
+  })()
 
   return { material, uniforms }
 }

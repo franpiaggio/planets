@@ -159,12 +159,21 @@ function pickCategory(): number {
 
 function randomizeRocky(palette: PlanetPalette) {
   planetUniforms.noiseScale.value = 2.2 + (Math.random() - 0.5) * 1.0       // 1.7–2.7
-  planetUniforms.lacunarity.value = 1.92 + (Math.random() - 0.5) * 0.5      // 1.67–2.17
+  planetUniforms.lacunarity.value = 2.05 + (Math.random() - 0.5) * 0.5      // 1.80–2.30
   planetUniforms.gain.value = 0.45 + (Math.random() - 0.5) * 0.2            // 0.35–0.55
   planetUniforms.terrainHeight.value = 0.15 + (Math.random() - 0.5) * 0.1   // 0.1–0.2
   planetUniforms.warpStrength.value = 0.55 + (Math.random() - 0.5) * 0.4    // 0.35–0.75
   planetUniforms.ridgeStrength.value = 0.12 + (Math.random() - 0.5) * 0.12  // 0.06–0.18
   planetUniforms.erosionStrength.value = Math.random() * 0.7                 // 0.0–0.7
+  planetUniforms.moistureScale.value = 1.2 + Math.random() * 1.6             // 1.2–2.8
+  planetUniforms.moistureOffset.value.set(
+    Math.random() * 100 - 50,
+    Math.random() * 100 - 50,
+    Math.random() * 100 - 50
+  )
+  planetUniforms.bumpStrength.value = 0.4 + Math.random() * 0.5             // 0.4–0.9
+  planetUniforms.terrainPower.value = 1.2 + Math.random() * 0.8             // 1.2–2.0
+  planetUniforms.worleyBlend.value = 0.1 + Math.random() * 0.25            // 0.1–0.35
 
   clouds.visible = true
   atmosphere.visible = true
