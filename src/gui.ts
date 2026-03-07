@@ -50,7 +50,9 @@ interface PostUniforms {
   }
   renderer: { toneMappingExposure: number }
   toggleEffect: (name: string, enabled: boolean) => void
+  togglePostProcessing: (enabled: boolean) => void
   effectToggles: Record<string, boolean>
+  postProcessingEnabled: boolean
 }
 
 let guiInstance: GUI | null = null
@@ -261,6 +263,10 @@ export function setupGui(planetUniforms: PlanetUniforms, atmosUniforms: Atmosphe
 
   // Post-processing
   const postFolder = gui.addFolder('Post Processing')
+
+  postFolder.add({ enabled: postUniforms.postProcessingEnabled }, 'enabled').name('Enabled').onChange((v: boolean) => {
+    postUniforms.togglePostProcessing(v)
+  })
 
   postFolder.add({ exposure: postUniforms.renderer.toneMappingExposure }, 'exposure', 0.5, 3.0, 0.05).name('Exposure').onChange((v: number) => {
     postUniforms.renderer.toneMappingExposure = v

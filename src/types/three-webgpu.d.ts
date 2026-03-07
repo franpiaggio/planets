@@ -1,5 +1,10 @@
 declare const __DEV__: boolean
 
+declare module '*.png?url' {
+  const src: string
+  export default src
+}
+
 // ---------------------------------------------------------------------------
 // Three.js WebGPU re-exports
 // ---------------------------------------------------------------------------
@@ -9,7 +14,7 @@ declare module 'three/webgpu' {
 
   export {
     Scene, PerspectiveCamera, Color, Vector3, Vector2,
-    SphereGeometry, BufferGeometry, PlaneGeometry, BoxGeometry,
+    SphereGeometry, BufferGeometry, PlaneGeometry, BoxGeometry, RingGeometry,
     Mesh, Points, Group, Object3D, Material, Sprite,
     BackSide, FrontSide, DoubleSide, AdditiveBlending,
     RepeatWrapping, ClampToEdgeWrapping, SRGBColorSpace,
@@ -86,6 +91,14 @@ declare module 'three/addons/tsl/display/BloomNode.js' {
     radius: { value: number }
     threshold: { value: number }
   }
+}
+
+declare module 'three/addons/tsl/display/LensflareNode.js' {
+  export function lensflare(node: any, params?: any): any
+}
+
+declare module 'three/addons/tsl/display/GaussianBlurNode.js' {
+  export function gaussianBlur(node: any, sigma?: number): any
 }
 
 declare module 'three/addons/tsl/display/AnamorphicNode.js' {

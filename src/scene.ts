@@ -1,5 +1,5 @@
 import {
-  PerspectiveCamera, Scene, Color, SphereGeometry, Mesh, Group, WebGPURenderer,
+  PerspectiveCamera, Scene, Color, SphereGeometry, RingGeometry, Mesh, Group, WebGPURenderer,
   DirectionalLight, AmbientLight, PostProcessing, Vector3
 } from 'three/webgpu'
 import { pass, mrt, output, normalView, metalness, uniform, nodeObject } from 'three/tsl'
@@ -18,6 +18,7 @@ import { createStarfield } from './stars'
 import { PALETTES } from './palettes'
 import type { PlanetPalette } from './palettes'
 import { createSunFlare } from './lensflare'
+import { createRingMaterial, RING_STYLES } from './shaders/rings'
 
 // ---------------------------------------------------------------------------
 // Scene state
@@ -35,6 +36,8 @@ let sunFlare: any
 let planet: Mesh
 let clouds: Mesh
 let atmosphere: Mesh
+let rings: Mesh
+let ringUniformsRef: ReturnType<typeof createRingMaterial>['uniforms']
 let planetUniforms: ReturnType<typeof createPlanetMaterial>['uniforms']
 let cloudUniformsRef: ReturnType<typeof createCloudMaterial>['uniforms']
 let atmosUniformsRef: ReturnType<typeof createAtmosphereMaterial>['uniforms']
@@ -49,6 +52,7 @@ let rawNodes: any = {}
 let dofFocusUniform: any
 let dofApertureUniform: any
 let dofMaxblurUniform: any
+let postProcessingEnabled = true
 let effectToggles = {
   bloom: true,
   anamorphic: false,
@@ -109,6 +113,10 @@ function buildPostProcessing() {
 export function toggleEffect(name: string, enabled: boolean) {
   (effectToggles as any)[name] = enabled
   buildPostProcessing()
+}
+
+export function togglePostProcessing(enabled: boolean) {
+  postProcessingEnabled = enabled
 }
 
 // ---------------------------------------------------------------------------
@@ -177,6 +185,34 @@ function randomizePlanet() {
   atmosphere.visible = true
   clouds.visible = true
 
+  // ~20% of planets get rings
+  rings.visible = Math.random() > 0.8
+  if (rings.visible) {
+    // Vary ring tilt slightly from equatorial
+    rings.rotation.x = Math.PI / 2 + (Math.random() - 0.5) * 0.3
+
+    // Pick a random ring style
+    const style = RING_STYLES[Math.floor(Math.random() * RING_STYLES.length)]
+    ringUniformsRef.bandFreq.value = style.bandFreq
+    ringUniformsRef.bandFreq2.value = style.bandFreq2
+    ringUniformsRef.gapPos1.value = style.gapPos1
+    ringUniformsRef.gapWidth1.value = style.gapWidth1
+    ringUniformsRef.gapPos2.value = style.gapPos2
+    ringUniformsRef.gapWidth2.value = style.gapWidth2
+    ringUniformsRef.gapPos3.value = style.gapPos3
+    ringUniformsRef.gapWidth3.value = style.gapWidth3
+    ringUniformsRef.innerTrim.value = style.innerTrim
+    ringUniformsRef.outerTrim.value = style.outerTrim
+    ringUniformsRef.densityVar.value = style.densityVar
+    ringUniformsRef.ringOpacity.value = style.opacity
+
+    // Colors from palette
+    const b = palette.biome
+    ringUniformsRef.ringColor1.value.set(b.sand)
+    ringUniformsRef.ringColor2.value.set(b.rock)
+    ringUniformsRef.ringColor3.value.set(b.snowDirty)
+  }
+
   // Axial tilt — only Z axis (side lean), never flipping toward/away from camera
   planetGroup.rotation.x = 0
   planetGroup.rotation.z = (Math.random() - 0.5) * 0.52                    // ±15°
@@ -187,7 +223,7 @@ function randomizePlanet() {
   const sunDir = new Vector3(Math.cos(sunAngle) * 5, sunY * 5, Math.sin(sunAngle) * 5)
   sun.position.copy(sunDir)
   planetUniforms.sunDirection.value.copy(sunDir).normalize()
-  sunFlare.position.copy(planetUniforms.sunDirection.value).multiplyScalar(30)
+  sunFlare.position.copy(planetUniforms.sunDirection.value).multiplyScalar(50)
 
   // Sync GUI if active
   refreshGui()
@@ -210,14 +246,15 @@ export async function init() {
   scene = new Scene()
   scene.background = new Color(0x000005)
   camera = new PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100)
-  camera.position.set(0, 0, 5)
+  const isMobile = window.innerWidth < 768
+  camera.position.set(0, 0, isMobile ? 8 : 5)
 
   // Renderer
   renderer = new WebGPURenderer({ antialias: true })
   renderer.setSize(window.innerWidth, window.innerHeight)
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
   renderer.toneMapping = 6 // AgXToneMapping
-  renderer.toneMappingExposure = 1.1
+  renderer.toneMappingExposure = 1.4
   document.body.appendChild(renderer.domElement)
   await renderer.init()
 
@@ -244,7 +281,7 @@ export async function init() {
   controls.rotateSpeed = 0.5
   controls.zoomSpeed = 0.5
   controls.minDistance = 2
-  controls.maxDistance = 7
+  controls.maxDistance = 14
 
   // Lighting
   sun = new DirectionalLight(0xffffff, 1.8)
@@ -252,9 +289,9 @@ export async function init() {
   scene.add(sun)
   scene.add(new AmbientLight(0x404060, 0.3))
 
-  // Lens flare — placed far in the sun direction
+  // Sun glow — bright HDR point, bloom creates the flare effect
   sunFlare = createSunFlare()
-  sunFlare.position.copy(new Vector3().copy(sun.position).normalize().multiplyScalar(30))
+  sunFlare.position.copy(new Vector3().copy(sun.position).normalize().multiplyScalar(50))
   scene.add(sunFlare)
 
   // Stars
@@ -282,9 +319,17 @@ export async function init() {
   planetGroup.add(atmosphere)
   applyInnerGlow(planetResult.material, planetUniforms, atmosUniforms)
 
+  // Rings
+  const { material: ringMat, uniforms: ringUniforms } = createRingMaterial(planetUniforms)
+  ringUniformsRef = ringUniforms
+  rings = new Mesh(new RingGeometry(1.4, 2.4, 96, 8), ringMat)
+  rings.rotation.x = Math.PI / 2  // flat on equatorial plane
+  rings.visible = false            // off by default
+  planetGroup.add(rings)
+
   // GUI (dev only)
   if (__DEV__) {
-    setupGui(planetUniforms, atmosUniforms, cloudUniforms, { passes, rawNodes, renderer, toggleEffect, effectToggles }, { clouds, atmosphere })
+    setupGui(planetUniforms, atmosUniforms, cloudUniforms, { passes, rawNodes, renderer, toggleEffect, togglePostProcessing, effectToggles, postProcessingEnabled }, { clouds, atmosphere })
   }
 
   // Randomize button
@@ -307,10 +352,13 @@ function animate() {
   cloudUniformsRef.uTime.value += 0.016
 
   controls.update()
-  const glowBillboard = sunFlare.getObjectByName('sunGlow')
-  if (glowBillboard) glowBillboard.lookAt(camera.position)
+  sunFlare.lookAt(camera.position)
   if (dofFocusUniform) dofFocusUniform.value = camera.position.length()
-  postProcessing.render()
+  if (postProcessingEnabled) {
+    postProcessing.render()
+  } else {
+    renderer.render(scene, camera)
+  }
 
   if (__DEV__ && stats) stats.update()
 }
