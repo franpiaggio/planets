@@ -97,7 +97,7 @@ export function refreshGui() {
   guiInstance.controllersRecursive().forEach(c => c.updateDisplay())
 }
 
-export function setupGui(planetUniforms: PlanetUniforms, atmosUniforms: AtmosphereUniforms, cloudUniforms: CloudUniforms, postUniforms: PostUniforms, meshes: MeshVisibility) {
+export function setupGui(planetUniforms: PlanetUniforms, atmosUniforms: AtmosphereUniforms, cloudUniforms: CloudUniforms, postUniforms: PostUniforms, meshes: MeshVisibility): GUI {
   const gui = new GUI({ title: 'Planet Controls' })
   guiInstance = gui
   guiPlanetUniforms = planetUniforms
@@ -314,4 +314,6 @@ export function setupGui(planetUniforms: PlanetUniforms, atmosUniforms: Atmosphe
   })
 
   postFolder.open()
+
+  return gui
 }

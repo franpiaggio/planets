@@ -327,10 +327,14 @@ export async function init() {
   rings.visible = false            // off by default
   planetGroup.add(rings)
 
-  // GUI (dev only)
-  if (__DEV__) {
-    setupGui(planetUniforms, atmosUniforms, cloudUniforms, { passes, rawNodes, renderer, toggleEffect, togglePostProcessing, effectToggles, postProcessingEnabled }, { clouds, atmosphere })
-  }
+  // GUI — hidden by default, toggle with 'o' key
+  const guiRef = setupGui(planetUniforms, atmosUniforms, cloudUniforms, { passes, rawNodes, renderer, toggleEffect, togglePostProcessing, effectToggles, postProcessingEnabled }, { clouds, atmosphere })
+  if (guiRef) guiRef.hide()
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'o' || e.key === 'O') {
+      if (guiRef) guiRef._hidden ? guiRef.show() : guiRef.hide()
+    }
+  })
 
   // Randomize button
   createRandomizeButton()
