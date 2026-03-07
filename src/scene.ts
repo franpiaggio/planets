@@ -245,32 +245,9 @@ function randomizePlanet() {
   const deformZ = 1.0 + (Math.random() - 0.5) * 0.12
   planetGroup.scale.set(baseScale * deformX, baseScale * deformY, baseScale * deformZ)
 
-  // ~20% of rocky planets get rings (gas handled above)
-  rings.visible = rings.visible || false
   if (rings.visible) {
-    // Vary ring tilt slightly from equatorial
-    rings.rotation.x = Math.PI / 2 + (Math.random() - 0.5) * 0.3
-
-    // Pick a random ring style
     const style = RING_STYLES[Math.floor(Math.random() * RING_STYLES.length)]
-    ringUniformsRef.bandFreq.value = style.bandFreq
-    ringUniformsRef.bandFreq2.value = style.bandFreq2
-    ringUniformsRef.gapPos1.value = style.gapPos1
-    ringUniformsRef.gapWidth1.value = style.gapWidth1
-    ringUniformsRef.gapPos2.value = style.gapPos2
-    ringUniformsRef.gapWidth2.value = style.gapWidth2
-    ringUniformsRef.gapPos3.value = style.gapPos3
-    ringUniformsRef.gapWidth3.value = style.gapWidth3
-    ringUniformsRef.innerTrim.value = style.innerTrim
-    ringUniformsRef.outerTrim.value = style.outerTrim
-    ringUniformsRef.densityVar.value = style.densityVar
-    ringUniformsRef.ringOpacity.value = style.opacity
-
-    // Colors from palette
-    const b = palette.biome
-    ringUniformsRef.ringColor1.value.set(b.sand)
-    ringUniformsRef.ringColor2.value.set(b.rock)
-    ringUniformsRef.ringColor3.value.set(b.snowDirty)
+    applyRingStyle(style, palette)
   }
 
   // Axial tilt — only Z axis (side lean), never flipping toward/away from camera
@@ -287,6 +264,25 @@ function randomizePlanet() {
 
   // Sync GUI if active
   refreshGui()
+}
+
+// Exported so GUI can reuse same randomization
+export { randomizePlanet }
+
+function applyRingStyle(style: typeof RING_STYLES[number], palette: PlanetPalette) {
+  rings.rotation.x = Math.PI / 2 + (Math.random() - 0.5) * 0.3
+  const styleKeys = [
+    'bandFreq', 'bandFreq2',
+    'gapPos1', 'gapWidth1', 'gapPos2', 'gapWidth2', 'gapPos3', 'gapWidth3',
+    'innerTrim', 'outerTrim', 'densityVar',
+  ] as const
+  for (const key of styleKeys) {
+    (ringUniformsRef as any)[key].value = style[key]
+  }
+  ringUniformsRef.ringOpacity.value = style.opacity
+  ringUniformsRef.ringColor1.value.set(palette.biome.sand)
+  ringUniformsRef.ringColor2.value.set(palette.biome.rock)
+  ringUniformsRef.ringColor3.value.set(palette.biome.snowDirty)
 }
 
 function createRandomizeBar() {
@@ -412,7 +408,7 @@ export async function init() {
   planetGroup.add(rings)
 
   // GUI — hidden by default, toggle with 'o' key
-  const guiRef = setupGui(planetUniforms, atmosUniforms, cloudUniforms, { passes, rawNodes, renderer, toggleEffect, togglePostProcessing, effectToggles, postProcessingEnabled }, { clouds, atmosphere })
+  const guiRef = setupGui(planetUniforms, atmosUniforms, cloudUniforms, { passes, rawNodes, renderer, toggleEffect, togglePostProcessing, effectToggles, postProcessingEnabled }, { clouds, atmosphere }, randomizePlanet)
   if (guiRef && !__DEV__) guiRef.hide()
   window.addEventListener('keydown', (e) => {
     if (e.key === 'o' || e.key === 'O') {

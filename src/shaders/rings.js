@@ -27,6 +27,12 @@ export function createRingMaterial(planetUniforms) {
     densityVar: uniform(0.15),
   }
 
+  // Helper: compute a smooth gap at a given position with a given width
+  const ringGap = (r, pos, width) => {
+    const hw = width.mul(0.5)
+    return smoothstep(pos.sub(hw), pos, r).mul(smoothstep(pos.add(hw), pos, r))
+  }
+
   const material = new MeshBasicNodeMaterial()
 
   material.colorNode = Fn(() => {
@@ -76,17 +82,9 @@ export function createRingMaterial(planetUniforms) {
     const r = dist.sub(uniforms.innerRadius).div(uniforms.outerRadius.sub(uniforms.innerRadius))
 
     // Configurable gaps
-    const halfW1 = uniforms.gapWidth1.mul(0.5)
-    const gap1 = smoothstep(uniforms.gapPos1.sub(halfW1), uniforms.gapPos1, r)
-      .mul(smoothstep(uniforms.gapPos1.add(halfW1), uniforms.gapPos1, r))
-
-    const halfW2 = uniforms.gapWidth2.mul(0.5)
-    const gap2 = smoothstep(uniforms.gapPos2.sub(halfW2), uniforms.gapPos2, r)
-      .mul(smoothstep(uniforms.gapPos2.add(halfW2), uniforms.gapPos2, r))
-
-    const halfW3 = uniforms.gapWidth3.mul(0.5)
-    const gap3 = smoothstep(uniforms.gapPos3.sub(halfW3), uniforms.gapPos3, r)
-      .mul(smoothstep(uniforms.gapPos3.add(halfW3), uniforms.gapPos3, r))
+    const gap1 = ringGap(r, uniforms.gapPos1, uniforms.gapWidth1)
+    const gap2 = ringGap(r, uniforms.gapPos2, uniforms.gapWidth2)
+    const gap3 = ringGap(r, uniforms.gapPos3, uniforms.gapWidth3)
 
     const gaps = float(1.0).sub(gap1).sub(gap2).sub(gap3)
 

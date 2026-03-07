@@ -94,7 +94,7 @@ export function refreshGui() {
   guiInstance.controllersRecursive().forEach(c => c.updateDisplay())
 }
 
-export function setupGui(planetUniforms: PlanetUniforms, atmosUniforms: AtmosphereUniforms, cloudUniforms: CloudUniforms, postUniforms: PostUniforms, meshes: MeshVisibility): GUI {
+export function setupGui(planetUniforms: PlanetUniforms, atmosUniforms: AtmosphereUniforms, cloudUniforms: CloudUniforms, postUniforms: PostUniforms, meshes: MeshVisibility, onRandomize: () => void): GUI {
   const gui = new GUI({ title: 'Planet Controls' })
   guiInstance = gui
   guiPlanetUniforms = planetUniforms
@@ -128,33 +128,7 @@ export function setupGui(planetUniforms: PlanetUniforms, atmosUniforms: Atmosphe
   guiParams = params
   guiCloudParams = cloudParams
 
-  // Randomize button
-  const randomize = () => {
-    params.noiseScale = 1.5 + Math.random() * 3.5
-    planetUniforms.noiseScale.value = params.noiseScale
-    params.lacunarity = 1.5 + Math.random() * 1.5
-    planetUniforms.lacunarity.value = params.lacunarity
-    params.gain = 0.2 + Math.random() * 0.5
-    planetUniforms.gain.value = params.gain
-    params.terrainHeight = 0.1 + Math.random() * 0.15
-    planetUniforms.terrainHeight.value = params.terrainHeight
-    params.seaLevel = 0.35 + Math.random() * 0.2
-    planetUniforms.seaLevel.value = params.seaLevel
-    params.warpStrength = 0.1 + Math.random() * 1.5
-    planetUniforms.warpStrength.value = params.warpStrength
-    // Clouds
-    cloudParams.cloudScale = 2.0 + Math.random() * 5.0
-    cloudUniforms.cloudScale.value = cloudParams.cloudScale
-    cloudParams.cloudDensity = 0.3 + Math.random() * 0.4
-    cloudUniforms.cloudDensity.value = cloudParams.cloudDensity
-    cloudParams.cloudSharpness = 1.5 + Math.random() * 6.0
-    cloudUniforms.cloudSharpness.value = cloudParams.cloudSharpness
-    cloudParams.cloudOpacity = 0.2 + Math.random() * 0.5
-    cloudUniforms.cloudOpacity.value = cloudParams.cloudOpacity
-    gui.controllersRecursive().forEach(c => c.updateDisplay())
-  }
-
-  gui.add({ randomize }, 'randomize').name('🎲 Randomize Planet')
+  gui.add({ randomize: onRandomize }, 'randomize').name('🎲 Randomize Planet')
 
   // Noise
   const noiseFolder = gui.addFolder('Noise')
