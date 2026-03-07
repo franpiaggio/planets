@@ -2,13 +2,14 @@ import GUI from 'lil-gui'
 import type { Vector3, Color } from 'three'
 
 interface PlanetUniforms {
-  noiseType: { value: number }
   noiseScale: { value: number }
   lacunarity: { value: number }
   gain: { value: number }
   terrainHeight: { value: number }
   seaLevel: { value: number }
   warpStrength: { value: number }
+  ridgeStrength: { value: number }
+  erosionStrength: { value: number }
   sunDirection: { value: Vector3 }
   seed: { value: Vector3 }
 }
@@ -29,10 +30,6 @@ interface AtmosphereUniforms {
   glowPower: { value: number }
 }
 
-const NOISE_TYPES: Record<string, number> = {
-  'Perlin': 1,
-  'Simplex': 2,
-}
 
 interface MeshVisibility {
   clouds: { visible: boolean }
@@ -68,15 +65,14 @@ export function refreshGui() {
   if (!guiInstance || !guiParams || !guiPlanetUniforms || !guiAtmosUniforms || !guiCloudUniforms) return
 
   const p = guiPlanetUniforms
-  const noiseTypeEntries = Object.entries(NOISE_TYPES)
-  const found = noiseTypeEntries.find(([, v]) => v === p.noiseType.value)
-  guiParams.noiseType = found ? found[0] : 'Simplex'
   guiParams.noiseScale = p.noiseScale.value
   guiParams.lacunarity = p.lacunarity.value
   guiParams.gain = p.gain.value
   guiParams.terrainHeight = p.terrainHeight.value
   guiParams.seaLevel = p.seaLevel.value
   guiParams.warpStrength = p.warpStrength.value
+  guiParams.ridgeStrength = p.ridgeStrength.value
+  guiParams.erosionStrength = p.erosionStrength.value
   guiParams.atmosphereColor = '#' + guiAtmosUniforms.atmosphereColor.value.getHexString()
   guiParams.twilightColor = '#' + guiAtmosUniforms.twilightColor.value.getHexString()
   guiParams.glowIntensity = guiAtmosUniforms.glowIntensity.value
@@ -106,13 +102,14 @@ export function setupGui(planetUniforms: PlanetUniforms, atmosUniforms: Atmosphe
   guiMeshes = meshes
 
   const params = {
-    noiseType: 'Simplex',
     noiseScale: planetUniforms.noiseScale.value,
     lacunarity: planetUniforms.lacunarity.value,
     gain: planetUniforms.gain.value,
     terrainHeight: planetUniforms.terrainHeight.value,
     seaLevel: planetUniforms.seaLevel.value,
     warpStrength: planetUniforms.warpStrength.value,
+    ridgeStrength: planetUniforms.ridgeStrength.value,
+    erosionStrength: planetUniforms.erosionStrength.value,
     atmosphereColor: '#' + atmosUniforms.atmosphereColor.value.getHexString(),
     twilightColor: '#' + atmosUniforms.twilightColor.value.getHexString(),
     glowIntensity: atmosUniforms.glowIntensity.value,
@@ -132,17 +129,13 @@ export function setupGui(planetUniforms: PlanetUniforms, atmosUniforms: Atmosphe
 
   // Randomize button
   const randomize = () => {
-    const types = Object.keys(NOISE_TYPES)
-    const type = types[Math.floor(Math.random() * types.length)]
-    params.noiseType = type
-    planetUniforms.noiseType.value = NOISE_TYPES[type]
     params.noiseScale = 1.5 + Math.random() * 3.5
     planetUniforms.noiseScale.value = params.noiseScale
     params.lacunarity = 1.5 + Math.random() * 1.5
     planetUniforms.lacunarity.value = params.lacunarity
     params.gain = 0.2 + Math.random() * 0.5
     planetUniforms.gain.value = params.gain
-    params.terrainHeight = 0.1 + Math.random() * 0.8
+    params.terrainHeight = 0.1 + Math.random() * 0.15
     planetUniforms.terrainHeight.value = params.terrainHeight
     params.seaLevel = 0.35 + Math.random() * 0.2
     planetUniforms.seaLevel.value = params.seaLevel
@@ -164,10 +157,6 @@ export function setupGui(planetUniforms: PlanetUniforms, atmosUniforms: Atmosphe
 
   // Noise
   const noiseFolder = gui.addFolder('Noise')
-
-  noiseFolder.add(params, 'noiseType', Object.keys(NOISE_TYPES)).name('Type').onChange((v: string) => {
-    planetUniforms.noiseType.value = NOISE_TYPES[v]
-  })
 
   noiseFolder.add(params, 'noiseScale', 0.5, 10, 0.1).name('Scale').onChange((v: number) => {
     planetUniforms.noiseScale.value = v
@@ -196,6 +185,14 @@ export function setupGui(planetUniforms: PlanetUniforms, atmosUniforms: Atmosphe
 
   terrainFolder.add(params, 'warpStrength', 0.0, 5.0, 0.05).name('Warp').onChange((v: number) => {
     planetUniforms.warpStrength.value = v
+  })
+
+  terrainFolder.add(params, 'ridgeStrength', 0.0, 0.5, 0.01).name('Ridge Strength').onChange((v: number) => {
+    planetUniforms.ridgeStrength.value = v
+  })
+
+  terrainFolder.add(params, 'erosionStrength', 0.0, 1.0, 0.05).name('Erosion').onChange((v: number) => {
+    planetUniforms.erosionStrength.value = v
   })
 
   terrainFolder.open()

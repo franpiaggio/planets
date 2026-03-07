@@ -4,7 +4,7 @@ import {
   positionLocal, normalLocal,
   mix, smoothstep, cos, sin
 } from 'three/tsl'
-import { fbm, gradientNoise3D } from '../lib/noise'
+import { noise3D, fbm, ridgedFbm, erosionFbm } from '../lib/noise'
 import { PALETTES } from '../palettes'
 
 // ---------------------------------------------------------------------------
@@ -38,13 +38,14 @@ export function createPlanetMaterial() {
   const biome = createBiomeUniforms(defaultPalette)
 
   const uniforms = {
-    noiseType: uniform(2),
     noiseScale: uniform(2.2),
-    lacunarity: uniform(2.2),
+    lacunarity: uniform(1.92),     // slightly below 2.0 to avoid lattice alignment
     gain: uniform(0.45),
-    terrainHeight: uniform(0.45),
+    terrainHeight: uniform(0.15),
     seaLevel: uniform(defaultPalette.seaLevel),
     warpStrength: uniform(0.55),
+    ridgeStrength: uniform(0.12),  // how prominent ridged mountains are on land
+    erosionStrength: uniform(0.0), // 0=smooth standard, 1=full erosion (flat valleys, rough peaks)
     sunDirection: uniform(new Vector3(1, 0.3, 0.5).normalize()),
     cloudRotationY: uniform(0.0),
     cloudShadow: uniform(0.3),
@@ -58,22 +59,39 @@ export function createPlanetMaterial() {
   const warpedPos = Fn(([pos]) => {
     const scaled = pos.add(uniforms.seed).mul(uniforms.noiseScale)
 
-    const warp1x = gradientNoise3D(scaled.add(vec3(0.0, 4.7, 2.3))).sub(0.5)
-    const warp1y = gradientNoise3D(scaled.add(vec3(1.3, 0.0, 6.7))).sub(0.5)
-    const warp1z = gradientNoise3D(scaled.add(vec3(3.7, 8.1, 0.0))).sub(0.5)
+    const warp1x = noise3D(scaled.add(vec3(0.0, 4.7, 2.3))).sub(0.5)
+    const warp1y = noise3D(scaled.add(vec3(1.3, 0.0, 6.7))).sub(0.5)
+    const warp1z = noise3D(scaled.add(vec3(3.7, 8.1, 0.0))).sub(0.5)
 
     return scaled.add(vec3(warp1x, warp1y, warp1z).mul(uniforms.warpStrength))
   })
 
-  // Terrain elevation with mountain detail
+  // Multi-scale terrain elevation:
+  //   1. Continental base (standard FBM) — defines land vs ocean
+  //   2. Mountain ridges (ridged FBM) — sharp peaks, only on land
+  //   3. Surface detail (single octave) — fine texture on highlands
   const getElevation = Fn(([pos]) => {
     const wp = warpedPos(pos)
-    const base = fbm(wp, uniforms.noiseType, float(4), uniforms.lacunarity, uniforms.gain)
+    const sea = uniforms.seaLevel
+    const lac = uniforms.lacunarity
+    const g = uniforms.gain
 
-    const highMask = smoothstep(uniforms.seaLevel.add(0.04), uniforms.seaLevel.add(0.12), base)
-    const sharpDetail = gradientNoise3D(pos.add(uniforms.seed).mul(uniforms.noiseScale.mul(4.0))).sub(0.5).mul(0.04)
+    // Layer 1: Continental shapes — blend between smooth FBM and eroded FBM
+    const smooth = fbm(wp, lac, g)
+    const eroded = erosionFbm(wp, lac, g)
+    const continent = mix(smooth, eroded, uniforms.erosionStrength)
 
-    return base.add(sharpDetail.mul(highMask))
+    // Land mask — ridges only appear on land, fade in above sea level
+    const landMask = smoothstep(sea, sea.add(0.06), continent)
+
+    // Layer 2: Mountain ridges at 2x frequency, masked to land
+    const ridges = ridgedFbm(wp.mul(2.0), lac, g)
+
+    // Layer 3: Fine surface detail on highlands
+    const highMask = smoothstep(sea.add(0.04), sea.add(0.12), continent)
+    const detail = noise3D(pos.add(uniforms.seed).mul(uniforms.noiseScale.mul(4.0))).sub(0.5).mul(0.04)
+
+    return continent.add(ridges.mul(uniforms.ridgeStrength).mul(landMask)).add(detail.mul(highMask))
   })
 
   // Cloud shadow sampling (matches cloud shader warp offsets)
@@ -87,14 +105,14 @@ export function createPlanetMaterial() {
     )
 
     const cScaled = cloudPos.add(uniforms.seed).mul(3.0)
-    const cw1x = gradientNoise3D(cScaled.add(vec3(9.2, 1.7, 4.3))).sub(0.5)
-    const cw1y = gradientNoise3D(cScaled.add(vec3(2.3, 8.1, 0.7))).sub(0.5)
-    const cw1z = gradientNoise3D(cScaled.add(vec3(5.7, 3.1, 9.0))).sub(0.5)
+    const cw1x = noise3D(cScaled.add(vec3(9.2, 1.7, 4.3))).sub(0.5)
+    const cw1y = noise3D(cScaled.add(vec3(2.3, 8.1, 0.7))).sub(0.5)
+    const cw1z = noise3D(cScaled.add(vec3(5.7, 3.1, 9.0))).sub(0.5)
     const cwp = cScaled.add(vec3(cw1x, cw1y, cw1z).mul(uniforms.warpStrength.mul(0.6)))
 
-    const cn = gradientNoise3D(cwp).mul(0.5)
-      .add(gradientNoise3D(cwp.mul(2.2)).mul(0.25))
-      .add(gradientNoise3D(cwp.mul(4.84)).mul(0.125))
+    const cn = noise3D(cwp).mul(0.5)
+      .add(noise3D(cwp.mul(2.2)).mul(0.25))
+      .add(noise3D(cwp.mul(4.84)).mul(0.125))
 
     return smoothstep(float(0.48), float(0.58), cn)
   })
@@ -115,7 +133,7 @@ export function createPlanetMaterial() {
     const pos = positionLocal
     const elevation = getElevation(pos)
     const sea = uniforms.seaLevel
-    const cv = gradientNoise3D(warpedPos(pos).mul(3.0))
+    const cv = noise3D(warpedPos(pos).mul(3.0))
 
     const col = vec3(uniforms.deepOcean).toVar()
     col.assign(mix(col, vec3(uniforms.midOcean),     smoothstep(sea.sub(0.15), sea.sub(0.06), elevation)))

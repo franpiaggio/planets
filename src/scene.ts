@@ -86,7 +86,7 @@ function initPasses() {
   const scenePassViewZ = scenePass.getViewZNode()
   dofFocusUniform = uniform(7.0)
   dofApertureUniform = uniform(0.0008)
-  dofMaxblurUniform = uniform(0.002)
+  dofMaxblurUniform = uniform(0.003)
   passes.dof = dof(scenePassColor, scenePassViewZ, dofFocusUniform, dofApertureUniform, dofMaxblurUniform)
   rawNodes.dof = { focus: dofFocusUniform, aperture: dofApertureUniform, maxblur: dofMaxblurUniform }
 
@@ -155,13 +155,13 @@ function randomizePlanet() {
   applyPalette(palette)
 
   // Subtle noise variation around defaults
-  const types = [1, 2]
-  planetUniforms.noiseType.value = types[Math.floor(Math.random() * types.length)]
   planetUniforms.noiseScale.value = 2.2 + (Math.random() - 0.5) * 1.0       // 1.7–2.7
-  planetUniforms.lacunarity.value = 2.2 + (Math.random() - 0.5) * 0.6       // 1.9–2.5
+  planetUniforms.lacunarity.value = 1.92 + (Math.random() - 0.5) * 0.5      // 1.67–2.17
   planetUniforms.gain.value = 0.45 + (Math.random() - 0.5) * 0.2            // 0.35–0.55
-  planetUniforms.terrainHeight.value = 0.45 + (Math.random() - 0.5) * 0.3   // 0.3–0.6
+  planetUniforms.terrainHeight.value = 0.15 + (Math.random() - 0.5) * 0.1   // 0.1–0.2
   planetUniforms.warpStrength.value = 0.55 + (Math.random() - 0.5) * 0.4    // 0.35–0.75
+  planetUniforms.ridgeStrength.value = 0.12 + (Math.random() - 0.5) * 0.12  // 0.06–0.18
+  planetUniforms.erosionStrength.value = Math.random() * 0.7                // 0.0–0.7
 
   // Subtle cloud variation
   cloudUniformsRef.cloudScale.value = 3.0 + (Math.random() - 0.5) * 2.0     // 2.0–4.0
@@ -329,7 +329,7 @@ export async function init() {
 
   // GUI — hidden by default, toggle with 'o' key
   const guiRef = setupGui(planetUniforms, atmosUniforms, cloudUniforms, { passes, rawNodes, renderer, toggleEffect, togglePostProcessing, effectToggles, postProcessingEnabled }, { clouds, atmosphere })
-  if (guiRef) guiRef.hide()
+  if (guiRef && !__DEV__) guiRef.hide()
   window.addEventListener('keydown', (e) => {
     if (e.key === 'o' || e.key === 'O') {
       if (guiRef) guiRef._hidden ? guiRef.show() : guiRef.hide()

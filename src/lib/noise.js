@@ -1,136 +1,181 @@
 import {
   Fn, float, vec3,
-  fract, sin, dot, floor, mix, abs,
-  smoothstep
+  abs, mix, clamp, smoothstep,
+  mx_noise_float
 } from 'three/tsl'
 
 // ---------------------------------------------------------------------------
-// Hash (pseudo-random from 3D position)
+// Base noise: MaterialX Perlin 3D (via mx_noise_float)
+// mx_noise_float(pos, amplitude, pivot) = perlin(pos) * amplitude + pivot
+// With defaults: returns ~[-1, 1]
+// noise3D remaps to [0, 1]
 // ---------------------------------------------------------------------------
 
-const hash31 = Fn(([p]) => {
-  const q = vec3(
-    dot(p, vec3(127.1, 311.7, 74.7)),
-    dot(p, vec3(269.5, 183.3, 246.1)),
-    dot(p, vec3(113.5, 271.9, 124.6))
-  )
-  return fract(sin(q).mul(43758.5453))
+const perlin3D = (p) => mx_noise_float(p, 1, 0)
+
+export const noise3D = Fn(([p]) => {
+  return perlin3D(p).mul(0.5).add(0.5)
 })
 
-// ---------------------------------------------------------------------------
-// Gradient Noise 3D (Perlin-like)
-// ---------------------------------------------------------------------------
-
-export const gradientNoise3D = Fn(([p]) => {
-  const i = floor(p)
-  const f = fract(p)
-
-  // Quintic interpolation
-  const u = f.mul(f).mul(f).mul(f.mul(f.mul(6.0).sub(15.0)).add(10.0))
-
-  const grad = Fn(([corner]) => {
-    const g = hash31(corner).mul(2.0).sub(1.0)
-    const d = f.sub(corner.sub(i))
-    return dot(g, d)
-  })
-
-  const c000 = grad(i)
-  const c100 = grad(i.add(vec3(1, 0, 0)))
-  const c010 = grad(i.add(vec3(0, 1, 0)))
-  const c110 = grad(i.add(vec3(1, 1, 0)))
-  const c001 = grad(i.add(vec3(0, 0, 1)))
-  const c101 = grad(i.add(vec3(1, 0, 1)))
-  const c011 = grad(i.add(vec3(0, 1, 1)))
-  const c111 = grad(i.add(vec3(1, 1, 1)))
-
-  const x0 = mix(mix(c000, c100, u.x), mix(c010, c110, u.x), u.y)
-  const x1 = mix(mix(c001, c101, u.x), mix(c011, c111, u.x), u.y)
-
-  // Remap from [-1,1] to [0,1]
-  return mix(x0, x1, u.z).mul(0.5).add(0.5)
-})
+// Keep this alias for backward compatibility with clouds.js, atmosphere.js, rings.js
+export const gradientNoise3D = noise3D
 
 // ---------------------------------------------------------------------------
-// Simplex-like Noise 3D
-// Rotated-domain gradient noise that breaks grid alignment
+// Standard FBM — 6 octaves, unrolled
+// Returns ~[0, 1]
 // ---------------------------------------------------------------------------
 
-const simplexNoise3D = Fn(([p]) => {
-  // Rotate input domain to break axis-aligned artifacts
-  const rp = vec3(
-    dot(p, vec3(0.5, -0.866025, 0.0)),
-    dot(p, vec3(0.866025, 0.5, 0.0)),
-    p.z.add(p.x.mul(0.3)).add(p.y.mul(0.3))
-  )
-
-  const i = floor(rp)
-  const f = fract(rp)
-
-  const u = f.mul(f).mul(f).mul(f.mul(f.mul(6.0).sub(15.0)).add(10.0))
-
-  // Different hash seeds than gradient noise for variety
-  const hash = Fn(([corner]) => {
-    const q = vec3(
-      dot(corner, vec3(37.1, 157.7, 97.7)),
-      dot(corner, vec3(191.5, 67.3, 213.1)),
-      dot(corner, vec3(59.5, 201.9, 71.6))
-    )
-    return fract(sin(q).mul(43758.5453)).mul(2.0).sub(1.0)
-  })
-
-  const grad = Fn(([corner]) => {
-    const g = hash(corner)
-    const d = f.sub(corner.sub(i))
-    return dot(g, d)
-  })
-
-  const c000 = grad(i)
-  const c100 = grad(i.add(vec3(1, 0, 0)))
-  const c010 = grad(i.add(vec3(0, 1, 0)))
-  const c110 = grad(i.add(vec3(1, 1, 0)))
-  const c001 = grad(i.add(vec3(0, 0, 1)))
-  const c101 = grad(i.add(vec3(1, 0, 1)))
-  const c011 = grad(i.add(vec3(0, 1, 1)))
-  const c111 = grad(i.add(vec3(1, 1, 1)))
-
-  const x0 = mix(mix(c000, c100, u.x), mix(c010, c110, u.x), u.y)
-  const x1 = mix(mix(c001, c101, u.x), mix(c011, c111, u.x), u.y)
-
-  return mix(x0, x1, u.z).mul(0.5).add(0.5)
-})
-
-// ---------------------------------------------------------------------------
-// Noise selector: 1 = Perlin, 2 = Simplex
-// ---------------------------------------------------------------------------
-
-export const sampleNoise = Fn(([p, noiseType]) => {
-  const g = gradientNoise3D(p)
-  const s = simplexNoise3D(p)
-  return mix(g, s, smoothstep(1.5, 2.5, noiseType))
-})
-
-// ---------------------------------------------------------------------------
-// FBM (4 octaves, unrolled)
-// ---------------------------------------------------------------------------
-
-export const fbm = Fn(([p, noiseType, octaves, lacunarity, gain]) => {
+export const fbm = Fn(([p, lacunarity, gain]) => {
   const value = float(0.0).toVar()
   const amplitude = float(0.5).toVar()
   const pos = p.toVar()
 
-  value.addAssign(sampleNoise(pos, noiseType).mul(amplitude))
+  // Octave 1
+  value.addAssign(noise3D(pos).mul(amplitude))
   pos.mulAssign(lacunarity)
   amplitude.mulAssign(gain)
-
-  value.addAssign(sampleNoise(pos, noiseType).mul(amplitude))
+  // Octave 2
+  value.addAssign(noise3D(pos).mul(amplitude))
   pos.mulAssign(lacunarity)
   amplitude.mulAssign(gain)
-
-  value.addAssign(sampleNoise(pos, noiseType).mul(amplitude))
+  // Octave 3
+  value.addAssign(noise3D(pos).mul(amplitude))
   pos.mulAssign(lacunarity)
   amplitude.mulAssign(gain)
-
-  value.addAssign(sampleNoise(pos, noiseType).mul(amplitude))
+  // Octave 4
+  value.addAssign(noise3D(pos).mul(amplitude))
+  pos.mulAssign(lacunarity)
+  amplitude.mulAssign(gain)
+  // Octave 5
+  value.addAssign(noise3D(pos).mul(amplitude))
+  pos.mulAssign(lacunarity)
+  amplitude.mulAssign(gain)
+  // Octave 6
+  value.addAssign(noise3D(pos).mul(amplitude))
 
   return value
 })
+
+// ---------------------------------------------------------------------------
+// Ridged Multifractal FBM — 6 octaves, unrolled
+// Sharp ridges, detail concentrates on peaks (heterogeneous)
+// Returns ~[0, 1]
+// ---------------------------------------------------------------------------
+
+export const ridgedFbm = Fn(([p, lacunarity, gain]) => {
+  const value = float(0.0).toVar()
+  const amplitude = float(0.5).toVar()
+  const weight = float(1.0).toVar()
+  const pos = p.toVar()
+
+  // Each octave: signal = (1 - |perlin|)^2 * weight
+  // perlin is in [-1,1], so |perlin| is [0,1], and 1-|perlin| peaks at zero crossings
+  // weight = clamp(signal * gain) — detail concentrates near ridges
+
+  // Octave 1
+  const s1 = float(1.0).sub(abs(perlin3D(pos))).toVar()
+  s1.assign(s1.mul(s1))
+  value.addAssign(s1.mul(amplitude))
+  weight.assign(clamp(s1.mul(gain), 0.0, 1.0))
+  pos.mulAssign(lacunarity)
+  amplitude.mulAssign(gain)
+
+  // Octave 2
+  const s2 = float(1.0).sub(abs(perlin3D(pos))).toVar()
+  s2.assign(s2.mul(s2).mul(weight))
+  value.addAssign(s2.mul(amplitude))
+  weight.assign(clamp(s2.mul(gain), 0.0, 1.0))
+  pos.mulAssign(lacunarity)
+  amplitude.mulAssign(gain)
+
+  // Octave 3
+  const s3 = float(1.0).sub(abs(perlin3D(pos))).toVar()
+  s3.assign(s3.mul(s3).mul(weight))
+  value.addAssign(s3.mul(amplitude))
+  weight.assign(clamp(s3.mul(gain), 0.0, 1.0))
+  pos.mulAssign(lacunarity)
+  amplitude.mulAssign(gain)
+
+  // Octave 4
+  const s4 = float(1.0).sub(abs(perlin3D(pos))).toVar()
+  s4.assign(s4.mul(s4).mul(weight))
+  value.addAssign(s4.mul(amplitude))
+  weight.assign(clamp(s4.mul(gain), 0.0, 1.0))
+  pos.mulAssign(lacunarity)
+  amplitude.mulAssign(gain)
+
+  // Octave 5
+  const s5 = float(1.0).sub(abs(perlin3D(pos))).toVar()
+  s5.assign(s5.mul(s5).mul(weight))
+  value.addAssign(s5.mul(amplitude))
+  weight.assign(clamp(s5.mul(gain), 0.0, 1.0))
+  pos.mulAssign(lacunarity)
+  amplitude.mulAssign(gain)
+
+  // Octave 6
+  const s6 = float(1.0).sub(abs(perlin3D(pos))).toVar()
+  s6.assign(s6.mul(s6).mul(weight))
+  value.addAssign(s6.mul(amplitude))
+
+  return value
+})
+
+// ---------------------------------------------------------------------------
+// Erosion FBM (IQ-inspired) — 4 octaves, unrolled
+// Uses central differences for derivative-based amplitude suppression.
+// Flat valleys + rough peaks = natural erosion look.
+// 4 octaves is enough — erosion effect is most visible at low/mid frequencies.
+// Returns ~[0, 1]
+// ---------------------------------------------------------------------------
+
+const DERIV_EPS = 0.01
+
+export const erosionFbm = Fn(([p, lacunarity, gain]) => {
+  const value = float(0.0).toVar()
+  const amplitude = float(0.5).toVar()
+  const derivX = float(0.0).toVar()
+  const derivY = float(0.0).toVar()
+  const pos = p.toVar()
+
+  // Octave 1
+  const n1 = perlin3D(pos).toVar()
+  const dx1 = perlin3D(pos.add(vec3(DERIV_EPS, 0, 0))).sub(n1).div(DERIV_EPS)
+  const dy1 = perlin3D(pos.add(vec3(0, DERIV_EPS, 0))).sub(n1).div(DERIV_EPS)
+  derivX.addAssign(dx1.mul(amplitude))
+  derivY.addAssign(dy1.mul(amplitude))
+  value.addAssign(amplitude.mul(n1).div(float(1.0).add(derivX.mul(derivX).add(derivY.mul(derivY)))))
+  pos.mulAssign(lacunarity)
+  amplitude.mulAssign(gain)
+
+  // Octave 2
+  const n2 = perlin3D(pos).toVar()
+  const dx2 = perlin3D(pos.add(vec3(DERIV_EPS, 0, 0))).sub(n2).div(DERIV_EPS)
+  const dy2 = perlin3D(pos.add(vec3(0, DERIV_EPS, 0))).sub(n2).div(DERIV_EPS)
+  derivX.addAssign(dx2.mul(amplitude))
+  derivY.addAssign(dy2.mul(amplitude))
+  value.addAssign(amplitude.mul(n2).div(float(1.0).add(derivX.mul(derivX).add(derivY.mul(derivY)))))
+  pos.mulAssign(lacunarity)
+  amplitude.mulAssign(gain)
+
+  // Octave 3
+  const n3 = perlin3D(pos).toVar()
+  const dx3 = perlin3D(pos.add(vec3(DERIV_EPS, 0, 0))).sub(n3).div(DERIV_EPS)
+  const dy3 = perlin3D(pos.add(vec3(0, DERIV_EPS, 0))).sub(n3).div(DERIV_EPS)
+  derivX.addAssign(dx3.mul(amplitude))
+  derivY.addAssign(dy3.mul(amplitude))
+  value.addAssign(amplitude.mul(n3).div(float(1.0).add(derivX.mul(derivX).add(derivY.mul(derivY)))))
+  pos.mulAssign(lacunarity)
+  amplitude.mulAssign(gain)
+
+  // Octave 4
+  const n4 = perlin3D(pos).toVar()
+  const dx4 = perlin3D(pos.add(vec3(DERIV_EPS, 0, 0))).sub(n4).div(DERIV_EPS)
+  const dy4 = perlin3D(pos.add(vec3(0, DERIV_EPS, 0))).sub(n4).div(DERIV_EPS)
+  derivX.addAssign(dx4.mul(amplitude))
+  derivY.addAssign(dy4.mul(amplitude))
+  value.addAssign(amplitude.mul(n4).div(float(1.0).add(derivX.mul(derivX).add(derivY.mul(derivY)))))
+
+  // Remap from ~[-0.5, 0.5] to [0, 1]
+  return value.mul(0.5).add(0.5)
+})
+
