@@ -9,11 +9,41 @@
       html, body { width: 100%; height: 100%; overflow: hidden; background: #000; touch-action: none; }
       canvas { display: block; width: 100%; height: 100%; }
 
-      .randomize-btn {
+      .randomize-bar {
         position: fixed;
         bottom: 24px;
         left: 50%;
         transform: translateX(-50%);
+        display: flex;
+        gap: 8px;
+        z-index: 100;
+      }
+      .category-select {
+        padding: 10px 14px;
+        font-size: 14px;
+        font-weight: 600;
+        border: none;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.12);
+        color: #fff;
+        cursor: pointer;
+        backdrop-filter: blur(8px);
+        transition: background 0.2s;
+        appearance: none;
+        -webkit-appearance: none;
+        padding-right: 28px;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='white' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 10px center;
+      }
+      .category-select:hover {
+        background-color: rgba(255, 255, 255, 0.22);
+      }
+      .category-select option {
+        background: #1a1a2e;
+        color: #fff;
+      }
+      .randomize-btn {
         padding: 10px 28px;
         font-size: 16px;
         font-weight: 600;
@@ -23,7 +53,6 @@
         color: #fff;
         cursor: pointer;
         backdrop-filter: blur(8px);
-        z-index: 100;
         transition: background 0.2s;
       }
       .randomize-btn:hover {

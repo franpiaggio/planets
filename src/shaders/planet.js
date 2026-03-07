@@ -2,10 +2,15 @@ import { Vector3, Color, MeshStandardNodeMaterial } from 'three/webgpu'
 import {
   Fn, float, vec3, uniform,
   positionLocal, normalLocal,
-  mix, smoothstep, cos, sin
+  mix, smoothstep, cos, sin, abs
 } from 'three/tsl'
 import { noise3D, fbm, ridgedFbm, erosionFbm } from '../lib/noise'
 import { PALETTES } from '../palettes'
+
+// Planet categories
+export const CATEGORY_ROCKY = 1
+export const CATEGORY_GAS = 2
+export const CATEGORY_LIQUID = 3
 
 // ---------------------------------------------------------------------------
 // Planet material
@@ -38,6 +43,7 @@ export function createPlanetMaterial() {
   const biome = createBiomeUniforms(defaultPalette)
 
   const uniforms = {
+    planetCategory: uniform(CATEGORY_ROCKY), // 1=rocky, 2=gas, 3=liquid
     noiseScale: uniform(2.2),
     lacunarity: uniform(1.92),     // slightly below 2.0 to avoid lattice alignment
     gain: uniform(0.45),
@@ -117,20 +123,22 @@ export function createPlanetMaterial() {
     return smoothstep(float(0.48), float(0.58), cn)
   })
 
-  // Vertex displacement
+  // Vertex displacement — only for rocky planets
   material.positionNode = Fn(() => {
     const pos = positionLocal
+    const isRocky = smoothstep(1.0, 1.5, uniforms.planetCategory)
+      .oneMinus() // 1 when rocky, 0 when gas/liquid
+
     const elevation = getElevation(pos)
     const seaLevel = uniforms.seaLevel
     const landHeight = smoothstep(seaLevel, seaLevel.add(0.01), elevation)
       .mul(elevation.sub(seaLevel))
 
-    return pos.add(normalLocal.mul(landHeight.mul(uniforms.terrainHeight)))
+    return pos.add(normalLocal.mul(landHeight.mul(uniforms.terrainHeight).mul(isRocky)))
   })()
 
-  // Biome coloring + cloud shadow
-  material.colorNode = Fn(() => {
-    const pos = positionLocal
+  // --- Rocky biome coloring ---
+  const getRockyColor = Fn(([pos]) => {
     const elevation = getElevation(pos)
     const sea = uniforms.seaLevel
     const cv = noise3D(warpedPos(pos).mul(3.0))
@@ -148,19 +156,89 @@ export function createPlanetMaterial() {
 
     const cloudMask = getCloudShadow(pos)
     col.assign(col.mul(float(1.0).sub(cloudMask.mul(uniforms.cloudShadow))))
+    return col
+  })
 
+  // --- Gas giant banded coloring ---
+  const getGasColor = Fn(([pos]) => {
+    const wp = warpedPos(pos)
+    const lat = pos.y // latitude proxy [-1, 1]
+
+    // Turbulent distortion of latitude for storms
+    const turbulence = noise3D(wp.mul(2.0)).sub(0.5).mul(uniforms.warpStrength.mul(0.3))
+    const distortedLat = lat.add(turbulence)
+
+    // Band pattern: high-frequency noise along latitude
+    const bandCoord = vec3(distortedLat.mul(8.0), float(0.0), float(0.0))
+    const band = noise3D(bandCoord)
+
+    // Storm detail overlay
+    const stormDetail = noise3D(wp.mul(4.0)).mul(0.3)
+
+    // 3-color band system using biome uniforms
+    const col = vec3(uniforms.sand).toVar() // base band color
+    col.assign(mix(col, vec3(uniforms.savanna), smoothstep(0.3, 0.5, band)))
+    col.assign(mix(col, vec3(uniforms.rock),    smoothstep(0.55, 0.75, band)))
+    col.assign(mix(col, vec3(uniforms.forest),  smoothstep(0.7, 0.9, band.add(stormDetail))))
+
+    // Polar darkening
+    const polarFade = smoothstep(0.85, 1.0, abs(lat))
+    col.assign(mix(col, col.mul(0.6), polarFade))
+
+    return col
+  })
+
+  // --- Liquid ocean world coloring ---
+  const getLiquidColor = Fn(([pos]) => {
+    const wp = warpedPos(pos)
+    const depthNoise = noise3D(wp.mul(1.5))
+
+    // Ocean depth variation
+    const col = vec3(uniforms.deepOcean).toVar()
+    col.assign(mix(col, vec3(uniforms.midOcean),     smoothstep(0.3, 0.5, depthNoise)))
+    col.assign(mix(col, vec3(uniforms.shallowWater), smoothstep(0.55, 0.7, depthNoise)))
+
+    // Subtle polar ice caps — only at extreme poles
+    const lat = pos.y
+    const iceMask = smoothstep(0.92, 0.98, abs(lat))
+    const iceNoise = noise3D(wp.mul(3.0))
+    col.assign(mix(col, vec3(uniforms.snow), iceMask.mul(smoothstep(0.45, 0.6, iceNoise)).mul(0.6)))
+
+    const cloudMask = getCloudShadow(pos)
+    col.assign(col.mul(float(1.0).sub(cloudMask.mul(uniforms.cloudShadow))))
+    return col
+  })
+
+  // --- Category-switched color ---
+  material.colorNode = Fn(() => {
+    const pos = positionLocal
+    const cat = uniforms.planetCategory
+
+    const rocky = getRockyColor(pos)
+    const gas = getGasColor(pos)
+    const liquid = getLiquidColor(pos)
+
+    // Blend: cat=1 → rocky, cat=2 → gas, cat=3 → liquid
+    const col = mix(rocky, gas, smoothstep(1.5, 2.0, cat)).toVar()
+    col.assign(mix(col, liquid, smoothstep(2.5, 3.0, cat)))
     return col
   })()
 
-  // Roughness per biome
+  // Roughness per category
   material.roughnessNode = Fn(() => {
+    const cat = uniforms.planetCategory
+
+    // Rocky: varies by elevation
     const elevation = getElevation(positionLocal)
     const sea = uniforms.seaLevel
+    const rockyR = float(0.8).toVar()
+    rockyR.assign(mix(rockyR, float(0.75), smoothstep(sea, sea.add(0.01), elevation)))
+    rockyR.assign(mix(rockyR, float(0.9),  smoothstep(sea.add(0.10), sea.add(0.16), elevation)))
+    rockyR.assign(mix(rockyR, float(0.6),  smoothstep(sea.add(0.16), sea.add(0.22), elevation)))
 
-    const r = float(0.8).toVar()
-    r.assign(mix(r, float(0.75), smoothstep(sea, sea.add(0.01), elevation)))
-    r.assign(mix(r, float(0.9),  smoothstep(sea.add(0.10), sea.add(0.16), elevation)))
-    r.assign(mix(r, float(0.6),  smoothstep(sea.add(0.16), sea.add(0.22), elevation)))
+    // Gas: matte (0.85), Liquid: slightly glossy (0.7)
+    const r = mix(rockyR, float(0.85), smoothstep(1.5, 2.0, cat)).toVar()
+    r.assign(mix(r, float(0.7), smoothstep(2.5, 3.0, cat)))
     return r
   })()
 

@@ -2,6 +2,7 @@ import GUI from 'lil-gui'
 import type { Vector3, Color } from 'three'
 
 interface PlanetUniforms {
+  planetCategory: { value: number }
   noiseScale: { value: number }
   lacunarity: { value: number }
   gain: { value: number }

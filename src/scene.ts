@@ -10,7 +10,7 @@ import { ao } from 'three/addons/tsl/display/GTAONode.js'
 import { ssr } from 'three/addons/tsl/display/SSRNode.js'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import Stats from 'stats-gl'
-import { createPlanetMaterial } from './shaders/planet'
+import { createPlanetMaterial, CATEGORY_ROCKY, CATEGORY_GAS, CATEGORY_LIQUID } from './shaders/planet'
 import { createAtmosphereMaterial, applyInnerGlow } from './shaders/atmosphere'
 import { createCloudMaterial } from './shaders/clouds'
 import { setupGui, refreshGui } from './gui'
@@ -60,6 +60,12 @@ let effectToggles = {
   ao: false,
   ssr: false,
 }
+
+// ---------------------------------------------------------------------------
+// Planet category filter: 0=all, 1=rocky, 2=gas, 3=liquid
+// ---------------------------------------------------------------------------
+
+let categoryFilter = 0
 
 // ---------------------------------------------------------------------------
 // Post-processing pipeline
@@ -142,6 +148,59 @@ function applyPalette(palette: PlanetPalette) {
   cloudUniformsRef.cloudColor.value.set(palette.cloud)
 }
 
+function pickCategory(): number {
+  if (categoryFilter !== 0) return categoryFilter
+  // Weighted random: 50% rocky, 25% gas, 25% liquid
+  const r = Math.random()
+  if (r < 0.5) return CATEGORY_ROCKY
+  if (r < 0.75) return CATEGORY_GAS
+  return CATEGORY_LIQUID
+}
+
+function randomizeRocky(palette: PlanetPalette) {
+  planetUniforms.noiseScale.value = 2.2 + (Math.random() - 0.5) * 1.0       // 1.7–2.7
+  planetUniforms.lacunarity.value = 1.92 + (Math.random() - 0.5) * 0.5      // 1.67–2.17
+  planetUniforms.gain.value = 0.45 + (Math.random() - 0.5) * 0.2            // 0.35–0.55
+  planetUniforms.terrainHeight.value = 0.15 + (Math.random() - 0.5) * 0.1   // 0.1–0.2
+  planetUniforms.warpStrength.value = 0.55 + (Math.random() - 0.5) * 0.4    // 0.35–0.75
+  planetUniforms.ridgeStrength.value = 0.12 + (Math.random() - 0.5) * 0.12  // 0.06–0.18
+  planetUniforms.erosionStrength.value = Math.random() * 0.7                 // 0.0–0.7
+
+  clouds.visible = true
+  atmosphere.visible = true
+  rings.visible = Math.random() > 0.85
+}
+
+function randomizeGas(palette: PlanetPalette) {
+  planetUniforms.noiseScale.value = 1.5 + Math.random() * 1.5               // 1.5–3.0
+  planetUniforms.lacunarity.value = 1.92 + (Math.random() - 0.5) * 0.4
+  planetUniforms.gain.value = 0.4 + Math.random() * 0.2
+  planetUniforms.terrainHeight.value = 0                                     // no displacement
+  planetUniforms.warpStrength.value = 0.6 + Math.random() * 0.8             // more turbulence
+  planetUniforms.ridgeStrength.value = 0
+  planetUniforms.erosionStrength.value = 0
+
+  clouds.visible = false       // surface IS the atmosphere
+  atmosphere.visible = true
+  rings.visible = Math.random() > 0.5  // gas giants often have rings
+}
+
+function randomizeLiquid(palette: PlanetPalette) {
+  planetUniforms.noiseScale.value = 2.0 + (Math.random() - 0.5) * 1.0
+  planetUniforms.lacunarity.value = 1.92 + (Math.random() - 0.5) * 0.4
+  planetUniforms.gain.value = 0.45 + (Math.random() - 0.5) * 0.2
+  planetUniforms.terrainHeight.value = 0                                     // no displacement
+  planetUniforms.warpStrength.value = 0.4 + Math.random() * 0.4
+  planetUniforms.ridgeStrength.value = 0
+  planetUniforms.erosionStrength.value = 0
+
+  clouds.visible = true
+  atmosphere.visible = true
+  cloudUniformsRef.cloudOpacity.value = 0.5 + Math.random() * 0.3           // heavy clouds
+  cloudUniformsRef.cloudDensity.value = 0.4 + Math.random() * 0.15
+  rings.visible = false
+}
+
 function randomizePlanet() {
   // Seed
   planetUniforms.seed.value.set(
@@ -150,43 +209,44 @@ function randomizePlanet() {
     Math.random() * 100 - 50
   )
 
+  // Category
+  const category = pickCategory()
+  planetUniforms.planetCategory.value = category
+
   // Palette
   const palette = PALETTES[Math.floor(Math.random() * PALETTES.length)]
   applyPalette(palette)
 
-  // Subtle noise variation around defaults
-  planetUniforms.noiseScale.value = 2.2 + (Math.random() - 0.5) * 1.0       // 1.7–2.7
-  planetUniforms.lacunarity.value = 1.92 + (Math.random() - 0.5) * 0.5      // 1.67–2.17
-  planetUniforms.gain.value = 0.45 + (Math.random() - 0.5) * 0.2            // 0.35–0.55
-  planetUniforms.terrainHeight.value = 0.15 + (Math.random() - 0.5) * 0.1   // 0.1–0.2
-  planetUniforms.warpStrength.value = 0.55 + (Math.random() - 0.5) * 0.4    // 0.35–0.75
-  planetUniforms.ridgeStrength.value = 0.12 + (Math.random() - 0.5) * 0.12  // 0.06–0.18
-  planetUniforms.erosionStrength.value = Math.random() * 0.7                // 0.0–0.7
+  // Category-specific parameters
+  if (category === CATEGORY_ROCKY) randomizeRocky(palette)
+  else if (category === CATEGORY_GAS) randomizeGas(palette)
+  else randomizeLiquid(palette)
 
-  // Subtle cloud variation
-  cloudUniformsRef.cloudScale.value = 3.0 + (Math.random() - 0.5) * 2.0     // 2.0–4.0
-  cloudUniformsRef.cloudDensity.value = 0.48 + (Math.random() - 0.5) * 0.15 // 0.4–0.56
-  cloudUniformsRef.cloudSharpness.value = 3.0 + (Math.random() - 0.5) * 2.0 // 2.0–4.0
-  cloudUniformsRef.cloudOpacity.value = 0.45 + (Math.random() - 0.5) * 0.2  // 0.35–0.55
+  // Shared cloud variation (only if clouds visible)
+  if (clouds.visible) {
+    cloudUniformsRef.cloudScale.value = 3.0 + (Math.random() - 0.5) * 2.0
+    cloudUniformsRef.cloudDensity.value = cloudUniformsRef.cloudDensity.value || 0.48
+    cloudUniformsRef.cloudSharpness.value = 3.0 + (Math.random() - 0.5) * 2.0
+  }
 
-  // Subtle atmosphere variation
-  atmosUniformsRef.glowIntensity.value = 0.5 + (Math.random() - 0.5) * 0.3  // 0.35–0.65
-  atmosUniformsRef.glowCoefficient.value = 0.55 + (Math.random() - 0.5) * 0.2 // 0.45–0.65
-  atmosUniformsRef.glowPower.value = 8.0 + (Math.random() - 0.5) * 3.0      // 6.5–9.5
+  // Atmosphere variation
+  atmosUniformsRef.glowIntensity.value = 0.5 + (Math.random() - 0.5) * 0.3
+  atmosUniformsRef.glowCoefficient.value = 0.55 + (Math.random() - 0.5) * 0.2
+  atmosUniformsRef.glowPower.value = 8.0 + (Math.random() - 0.5) * 3.0
 
-  // Planet size and shape
-  const baseScale = 0.6 + Math.random() * 0.8                               // 0.6–1.4
-  const deformX = 1.0 + (Math.random() - 0.5) * 0.12                        // 0.94–1.06
-  const deformY = 1.0 + (Math.random() - 0.5) * 0.12                        // oblate/prolate
+  // Planet size — gas giants tend to be bigger
+  const sizeBase = category === CATEGORY_GAS ? 1.0 : 0.6
+  const sizeRange = category === CATEGORY_GAS ? 0.6 : 0.8
+  const baseScale = sizeBase + Math.random() * sizeRange
+  const deformX = 1.0 + (Math.random() - 0.5) * 0.12
+  const deformY = category === CATEGORY_GAS
+    ? 1.0 - Math.random() * 0.08   // gas giants are oblate
+    : 1.0 + (Math.random() - 0.5) * 0.12
   const deformZ = 1.0 + (Math.random() - 0.5) * 0.12
   planetGroup.scale.set(baseScale * deformX, baseScale * deformY, baseScale * deformZ)
 
-  // Always show atmosphere and clouds
-  atmosphere.visible = true
-  clouds.visible = true
-
-  // ~20% of planets get rings
-  rings.visible = Math.random() > 0.8
+  // ~20% of rocky planets get rings (gas handled above)
+  rings.visible = rings.visible || false
   if (rings.visible) {
     // Vary ring tilt slightly from equatorial
     rings.rotation.x = Math.PI / 2 + (Math.random() - 0.5) * 0.3
@@ -229,12 +289,36 @@ function randomizePlanet() {
   refreshGui()
 }
 
-function createRandomizeButton() {
+function createRandomizeBar() {
+  const bar = document.createElement('div')
+  bar.className = 'randomize-bar'
+
+  const select = document.createElement('select')
+  select.className = 'category-select'
+  const options = [
+    { label: 'All', value: 0 },
+    { label: 'Rocky', value: CATEGORY_ROCKY },
+    { label: 'Gas Giant', value: CATEGORY_GAS },
+    { label: 'Liquid', value: CATEGORY_LIQUID },
+  ]
+  for (const opt of options) {
+    const o = document.createElement('option')
+    o.value = String(opt.value)
+    o.textContent = opt.label
+    select.appendChild(o)
+  }
+  select.addEventListener('change', () => {
+    categoryFilter = Number(select.value)
+  })
+
   const btn = document.createElement('button')
   btn.textContent = 'Randomize'
   btn.className = 'randomize-btn'
   btn.addEventListener('click', randomizePlanet)
-  document.body.appendChild(btn)
+
+  bar.appendChild(select)
+  bar.appendChild(btn)
+  document.body.appendChild(bar)
 }
 
 // ---------------------------------------------------------------------------
@@ -337,7 +421,7 @@ export async function init() {
   })
 
   // Randomize button
-  createRandomizeButton()
+  createRandomizeBar()
 
   window.addEventListener('resize', onResize)
   renderer.setAnimationLoop(animate)
