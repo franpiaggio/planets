@@ -2,7 +2,7 @@ import { Vector3, Color, MeshStandardNodeMaterial } from 'three/webgpu'
 import {
   Fn, float, vec3, uniform,
   positionLocal, normalLocal, normalView,
-  mix, smoothstep, cos, sin, abs, max, cross, normalize
+  mix, smoothstep, abs, max, cross, normalize
 } from 'three/tsl'
 import { noise3D, fbm, ridgedFbm, erosionFbm, worley3D, worleyEdge3D } from '../lib/noise'
 import { PALETTES } from '../palettes'
@@ -45,7 +45,7 @@ export function createPlanetMaterial() {
   const uniforms = {
     planetCategory: uniform(CATEGORY_ROCKY), // 1=rocky, 2=gas, 3=liquid
     noiseScale: uniform(2.2),
-    lacunarity: uniform(2.05),     // higher = more visible multi-scale detail
+    lacunarity: uniform(2.7),      // higher = more visible multi-scale detail
     gain: uniform(0.45),
     terrainHeight: uniform(0.15),
     seaLevel: uniform(defaultPalette.seaLevel),
@@ -58,8 +58,6 @@ export function createPlanetMaterial() {
     bumpStrength: uniform(0.6),       // procedural normal perturbation strength
     terrainPower: uniform(1.5),       // power redistribution: >1 = flatter valleys, sharper peaks
     worleyBlend: uniform(0.15),       // how much Worley pattern mixes into coloring
-    cloudRotationY: uniform(0.0),
-    cloudShadow: uniform(0.3),
     seed: uniform(new Vector3(0, 0, 0)),
     ...biome,
   }
@@ -105,29 +103,6 @@ export function createPlanetMaterial() {
     const raw = continent.add(ridges.mul(uniforms.ridgeStrength).mul(landMask)).add(detail.mul(highMask))
     // Power redistribution — flattens valleys, sharpens peaks
     return raw.pow(uniforms.terrainPower)
-  })
-
-  // Cloud shadow sampling (matches cloud shader warp offsets)
-  const getCloudShadow = Fn(([pos]) => {
-    const cosR = cos(uniforms.cloudRotationY)
-    const sinR = sin(uniforms.cloudRotationY)
-    const cloudPos = vec3(
-      pos.x.mul(cosR).sub(pos.z.mul(sinR)),
-      pos.y,
-      pos.x.mul(sinR).add(pos.z.mul(cosR))
-    )
-
-    const cScaled = cloudPos.add(uniforms.seed).mul(3.0)
-    const cw1x = noise3D(cScaled.add(vec3(9.2, 1.7, 4.3))).sub(0.5)
-    const cw1y = noise3D(cScaled.add(vec3(2.3, 8.1, 0.7))).sub(0.5)
-    const cw1z = noise3D(cScaled.add(vec3(5.7, 3.1, 9.0))).sub(0.5)
-    const cwp = cScaled.add(vec3(cw1x, cw1y, cw1z).mul(uniforms.warpStrength.mul(0.6)))
-
-    const cn = noise3D(cwp).mul(0.5)
-      .add(noise3D(cwp.mul(2.2)).mul(0.25))
-      .add(noise3D(cwp.mul(4.84)).mul(0.125))
-
-    return smoothstep(float(0.48), float(0.58), cn)
   })
 
   // Vertex displacement — only for rocky planets
@@ -189,9 +164,6 @@ export function createPlanetMaterial() {
     const edgeDarken = we.mul(0.12).mul(landMask).mul(uniforms.worleyBlend.mul(3.0))
     col.assign(col.mul(float(1.0).sub(edgeDarken)))
 
-    // Cloud shadow
-    const cloudMask = getCloudShadow(pos)
-    col.assign(col.mul(float(1.0).sub(cloudMask.mul(uniforms.cloudShadow))))
     return col
   })
 
@@ -240,8 +212,6 @@ export function createPlanetMaterial() {
     const iceNoise = noise3D(wp.mul(3.0))
     col.assign(mix(col, vec3(uniforms.snow), iceMask.mul(smoothstep(0.45, 0.6, iceNoise)).mul(0.6)))
 
-    const cloudMask = getCloudShadow(pos)
-    col.assign(col.mul(float(1.0).sub(cloudMask.mul(uniforms.cloudShadow))))
     return col
   })
 

@@ -2,12 +2,10 @@ import {
   PerspectiveCamera, Scene, Color, SphereGeometry, RingGeometry, Mesh, Group, WebGPURenderer,
   DirectionalLight, AmbientLight, PostProcessing, Vector3
 } from 'three/webgpu'
-import { pass, mrt, output, normalView, metalness, uniform, nodeObject } from 'three/tsl'
+import { pass, uniform, nodeObject } from 'three/tsl'
 import BloomNode from 'three/addons/tsl/display/BloomNode.js'
 import { anamorphic } from 'three/addons/tsl/display/AnamorphicNode.js'
 import { dof } from 'three/addons/tsl/display/DepthOfFieldNode.js'
-import { ao } from 'three/addons/tsl/display/GTAONode.js'
-import { ssr } from 'three/addons/tsl/display/SSRNode.js'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import Stats from 'stats-gl'
 import { createPlanetMaterial, CATEGORY_ROCKY, CATEGORY_GAS, CATEGORY_LIQUID } from './shaders/planet'
@@ -19,6 +17,11 @@ import { PALETTES } from './palettes'
 import type { PlanetPalette } from './palettes'
 import { createSunFlare } from './lensflare'
 import { createRingMaterial, RING_STYLES } from './shaders/rings'
+import type { PlanetConfig } from './planetConfig'
+import {
+  ROCKY_RANGES, GAS_RANGES, LIQUID_RANGES, SHARED_RANGES, SIZE_RANGES,
+  CATEGORY_WEIGHTS, randomInRange, randomWeighted,
+} from './ranges'
 
 // ---------------------------------------------------------------------------
 // Scene state
@@ -57,8 +60,6 @@ let effectToggles = {
   bloom: true,
   anamorphic: false,
   dof: true,
-  ao: false,
-  ssr: false,
 }
 
 // ---------------------------------------------------------------------------
@@ -74,8 +75,6 @@ let categoryFilter = 0
 function initPasses() {
   const scenePassColor = scenePass.getTextureNode('output')
   const scenePassDepth = scenePass.getTextureNode('depth')
-  const scenePassNormal = scenePass.getTextureNode('normal')
-  const scenePassMetalness = scenePass.getTextureNode('metalness')
 
   // Bloom — high threshold so only HDR stars (>1.5) bloom
   const bloomNode = new BloomNode(nodeObject(scenePassColor), 0.7, 0.5, 1.5)
@@ -96,18 +95,12 @@ function initPasses() {
   passes.dof = dof(scenePassColor, scenePassViewZ, dofFocusUniform, dofApertureUniform, dofMaxblurUniform)
   rawNodes.dof = { focus: dofFocusUniform, aperture: dofApertureUniform, maxblur: dofMaxblurUniform }
 
-  // AO & SSR
-  passes.ao = ao(scenePassDepth, scenePassNormal, camera)
-  passes.ssr = ssr(scenePassColor, scenePassDepth, scenePassNormal, scenePassMetalness, camera)
-
   passes._scenePassColor = scenePassColor
 }
 
 function buildPostProcessing() {
   let result = passes._scenePassColor
 
-  if (effectToggles.ao) result = result.mul(passes.ao.getTextureNode())
-  if (effectToggles.ssr) result = passes.ssr
   if (effectToggles.dof) result = passes.dof
   if (effectToggles.bloom) result = result.add(passes.bloom)
   if (effectToggles.anamorphic) result = result.add(passes.anamorphic)
@@ -145,7 +138,14 @@ function applyPalette(palette: PlanetPalette) {
   planetUniforms.seaLevel.value = palette.seaLevel + (Math.random() - 0.5) * 0.08
   atmosUniformsRef.atmosphereColor.value.set(palette.atmosphere)
   atmosUniformsRef.twilightColor.value.set(palette.twilight)
+  // Cloud color: palette base + subtle random variation
   cloudUniformsRef.cloudColor.value.set(palette.cloud)
+  const hsl = { h: 0, s: 0, l: 0 }
+  cloudUniformsRef.cloudColor.value.getHSL(hsl)
+  hsl.h += (Math.random() - 0.5) * 0.06    // slight hue shift
+  hsl.s = Math.min(1, hsl.s + Math.random() * 0.1)  // slightly more or less saturated
+  hsl.l = Math.min(1, hsl.l * (0.85 + Math.random() * 0.3))  // brightness variation
+  cloudUniformsRef.cloudColor.value.setHSL(hsl.h, hsl.s, hsl.l)
 }
 
 function pickCategory(): number {
@@ -158,64 +158,75 @@ function pickCategory(): number {
 }
 
 function randomizeRocky(palette: PlanetPalette) {
-  planetUniforms.noiseScale.value = 2.2 + (Math.random() - 0.5) * 1.0       // 1.7–2.7
-  planetUniforms.lacunarity.value = 2.05 + (Math.random() - 0.5) * 0.5      // 1.80–2.30
-  planetUniforms.gain.value = 0.45 + (Math.random() - 0.5) * 0.2            // 0.35–0.55
-  planetUniforms.terrainHeight.value = 0.15 + (Math.random() - 0.5) * 0.1   // 0.1–0.2
-  planetUniforms.warpStrength.value = 0.55 + (Math.random() - 0.5) * 0.4    // 0.35–0.75
-  planetUniforms.ridgeStrength.value = 0.12 + (Math.random() - 0.5) * 0.12  // 0.06–0.18
-  planetUniforms.erosionStrength.value = Math.random() * 0.7                 // 0.0–0.7
-  planetUniforms.moistureScale.value = 1.2 + Math.random() * 1.6             // 1.2–2.8
+  const r = ROCKY_RANGES
+  const s = SHARED_RANGES
+
+  planetUniforms.noiseScale.value = randomWeighted(r.noiseScale)
+  planetUniforms.seaLevel.value = randomWeighted(r.seaLevel)
+  planetUniforms.lacunarity.value = randomInRange(r.lacunarity)
+  planetUniforms.gain.value = randomInRange(r.gain)
+  planetUniforms.terrainHeight.value = randomInRange(r.terrainHeight)
+  planetUniforms.warpStrength.value = randomInRange(r.warpStrength)
+  planetUniforms.ridgeStrength.value = randomInRange(r.ridgeStrength)
+  planetUniforms.erosionStrength.value = randomInRange(r.erosionStrength)
+  planetUniforms.moistureScale.value = randomInRange(r.moistureScale)
   planetUniforms.moistureOffset.value.set(
-    Math.random() * 100 - 50,
-    Math.random() * 100 - 50,
-    Math.random() * 100 - 50
+    randomInRange(s.moistureOffset),
+    randomInRange(s.moistureOffset),
+    randomInRange(s.moistureOffset)
   )
-  planetUniforms.bumpStrength.value = 0.4 + Math.random() * 0.5             // 0.4–0.9
-  planetUniforms.terrainPower.value = 1.2 + Math.random() * 0.8             // 1.2–2.0
-  planetUniforms.worleyBlend.value = 0.1 + Math.random() * 0.25            // 0.1–0.35
+  planetUniforms.bumpStrength.value = randomInRange(r.bumpStrength)
+  planetUniforms.terrainPower.value = randomInRange(r.terrainPower)
+  planetUniforms.worleyBlend.value = randomInRange(r.worleyBlend)
+
 
   clouds.visible = true
   atmosphere.visible = true
-  rings.visible = Math.random() > 0.85
+  rings.visible = Math.random() < r.ringChance
 }
 
 function randomizeGas(palette: PlanetPalette) {
-  planetUniforms.noiseScale.value = 1.5 + Math.random() * 1.5               // 1.5–3.0
-  planetUniforms.lacunarity.value = 1.92 + (Math.random() - 0.5) * 0.4
-  planetUniforms.gain.value = 0.4 + Math.random() * 0.2
-  planetUniforms.terrainHeight.value = 0                                     // no displacement
-  planetUniforms.warpStrength.value = 0.6 + Math.random() * 0.8             // more turbulence
+  const r = GAS_RANGES
+
+  planetUniforms.noiseScale.value = randomInRange(r.noiseScale)
+  planetUniforms.lacunarity.value = randomInRange(r.lacunarity)
+  planetUniforms.gain.value = randomInRange(r.gain)
+  planetUniforms.terrainHeight.value = 0
+  planetUniforms.warpStrength.value = randomInRange(r.warpStrength)
   planetUniforms.ridgeStrength.value = 0
   planetUniforms.erosionStrength.value = 0
-
-  clouds.visible = false       // surface IS the atmosphere
+  clouds.visible = false
   atmosphere.visible = true
-  rings.visible = Math.random() > 0.5  // gas giants often have rings
+  rings.visible = Math.random() < r.ringChance
 }
 
 function randomizeLiquid(palette: PlanetPalette) {
-  planetUniforms.noiseScale.value = 2.0 + (Math.random() - 0.5) * 1.0
-  planetUniforms.lacunarity.value = 1.92 + (Math.random() - 0.5) * 0.4
-  planetUniforms.gain.value = 0.45 + (Math.random() - 0.5) * 0.2
-  planetUniforms.terrainHeight.value = 0                                     // no displacement
-  planetUniforms.warpStrength.value = 0.4 + Math.random() * 0.4
+  const r = LIQUID_RANGES
+
+  planetUniforms.noiseScale.value = randomInRange(r.noiseScale)
+  planetUniforms.lacunarity.value = randomInRange(r.lacunarity)
+  planetUniforms.gain.value = randomInRange(r.gain)
+  planetUniforms.terrainHeight.value = 0
+  planetUniforms.warpStrength.value = randomInRange(r.warpStrength)
   planetUniforms.ridgeStrength.value = 0
   planetUniforms.erosionStrength.value = 0
 
   clouds.visible = true
   atmosphere.visible = true
-  cloudUniformsRef.cloudOpacity.value = 0.5 + Math.random() * 0.3           // heavy clouds
-  cloudUniformsRef.cloudDensity.value = 0.4 + Math.random() * 0.15
+  cloudUniformsRef.cloudOpacity.value = randomInRange(r.cloudOpacity)
+  cloudUniformsRef.cloudDensity.value = randomInRange(r.cloudDensity)
+
   rings.visible = false
 }
 
 function randomizePlanet() {
+  const s = SHARED_RANGES
+
   // Seed
   planetUniforms.seed.value.set(
-    Math.random() * 100 - 50,
-    Math.random() * 100 - 50,
-    Math.random() * 100 - 50
+    randomInRange(s.seed),
+    randomInRange(s.seed),
+    randomInRange(s.seed)
   )
 
   // Category
@@ -233,25 +244,25 @@ function randomizePlanet() {
 
   // Shared cloud variation (only if clouds visible)
   if (clouds.visible) {
-    cloudUniformsRef.cloudScale.value = 3.0 + (Math.random() - 0.5) * 2.0
+    cloudUniformsRef.cloudScale.value = randomInRange(s.cloudScale)
     cloudUniformsRef.cloudDensity.value = cloudUniformsRef.cloudDensity.value || 0.48
-    cloudUniformsRef.cloudSharpness.value = 3.0 + (Math.random() - 0.5) * 2.0
+    cloudUniformsRef.cloudSharpness.value = randomInRange(s.cloudSharpness)
   }
 
   // Atmosphere variation
-  atmosUniformsRef.glowIntensity.value = 0.5 + (Math.random() - 0.5) * 0.3
-  atmosUniformsRef.glowCoefficient.value = 0.55 + (Math.random() - 0.5) * 0.2
-  atmosUniformsRef.glowPower.value = 8.0 + (Math.random() - 0.5) * 3.0
+  atmosUniformsRef.glowIntensity.value = randomInRange(s.glowIntensity)
+  atmosUniformsRef.glowCoefficient.value = randomInRange(s.glowCoefficient)
+  atmosUniformsRef.glowPower.value = randomInRange(s.glowPower)
 
-  // Planet size — gas giants tend to be bigger
-  const sizeBase = category === CATEGORY_GAS ? 1.0 : 0.6
-  const sizeRange = category === CATEGORY_GAS ? 0.6 : 0.8
-  const baseScale = sizeBase + Math.random() * sizeRange
-  const deformX = 1.0 + (Math.random() - 0.5) * 0.12
-  const deformY = category === CATEGORY_GAS
-    ? 1.0 - Math.random() * 0.08   // gas giants are oblate
-    : 1.0 + (Math.random() - 0.5) * 0.12
-  const deformZ = 1.0 + (Math.random() - 0.5) * 0.12
+  // Planet size
+  const sizeKey = category === CATEGORY_GAS ? 'gas' : 'rocky'
+  const size = SIZE_RANGES[sizeKey]
+  const baseScale = size.base + Math.random() * size.range
+  const deformX = 1.0 + (Math.random() - 0.5) * size.deform
+  const deformY = 'oblate' in size
+    ? 1.0 - Math.random() * size.oblate!
+    : 1.0 + (Math.random() - 0.5) * size.deform
+  const deformZ = 1.0 + (Math.random() - 0.5) * size.deform
   planetGroup.scale.set(baseScale * deformX, baseScale * deformY, baseScale * deformZ)
 
   if (rings.visible) {
@@ -259,13 +270,13 @@ function randomizePlanet() {
     applyRingStyle(style, palette)
   }
 
-  // Axial tilt — only Z axis (side lean), never flipping toward/away from camera
+  // Axial tilt
   planetGroup.rotation.x = 0
-  planetGroup.rotation.z = (Math.random() - 0.5) * 0.52                    // ±15°
+  planetGroup.rotation.z = randomInRange(s.axialTilt)
 
-  // Sun direction — always from camera side, vary left/right
-  const sunAngle = (Math.random() - 0.5) * Math.PI * 0.8                   // ±72° from center
-  const sunY = 0.2 + (Math.random() - 0.5) * 0.3                           // 0.05–0.35, never top/bottom
+  // Sun direction
+  const sunAngle = randomInRange(s.sunAngle) * Math.PI
+  const sunY = randomInRange(s.sunY)
   const sunDir = new Vector3(Math.cos(sunAngle) * 5, sunY * 5, Math.sin(sunAngle) * 5)
   sun.position.copy(sunDir)
   planetUniforms.sunDirection.value.copy(sunDir).normalize()
@@ -327,6 +338,178 @@ function createRandomizeBar() {
 }
 
 // ---------------------------------------------------------------------------
+// Config read / apply — exact planet reproduction
+// ---------------------------------------------------------------------------
+
+export function readConfig(): PlanetConfig {
+  const p = planetUniforms
+  const c = cloudUniformsRef
+  const a = atmosUniformsRef
+  const r = ringUniformsRef
+
+  return {
+    category: p.planetCategory.value,
+    seed: { x: p.seed.value.x, y: p.seed.value.y, z: p.seed.value.z },
+    terrain: {
+      noiseScale: p.noiseScale.value,
+      lacunarity: p.lacunarity.value,
+      gain: p.gain.value,
+      terrainHeight: p.terrainHeight.value,
+      seaLevel: p.seaLevel.value,
+      warpStrength: p.warpStrength.value,
+      ridgeStrength: p.ridgeStrength.value,
+      erosionStrength: p.erosionStrength.value,
+      terrainPower: p.terrainPower.value,
+      moistureScale: p.moistureScale.value,
+      moistureOffset: { x: p.moistureOffset.value.x, y: p.moistureOffset.value.y, z: p.moistureOffset.value.z },
+      bumpStrength: p.bumpStrength.value,
+      worleyBlend: p.worleyBlend.value,
+    },
+    biome: {
+      deepOcean: p.deepOcean.value.getHex(),
+      midOcean: p.midOcean.value.getHex(),
+      shallowWater: p.shallowWater.value.getHex(),
+      coast: p.coast.value.getHex(),
+      sand: p.sand.value.getHex(),
+      sand2: p.sand2.value.getHex(),
+      savanna: p.savanna.value.getHex(),
+      savanna2: p.savanna2.value.getHex(),
+      grass: p.grass.value.getHex(),
+      grass2: p.grass2.value.getHex(),
+      forest: p.forest.value.getHex(),
+      forest2: p.forest2.value.getHex(),
+      rock: p.rock.value.getHex(),
+      rock2: p.rock2.value.getHex(),
+      snow: p.snow.value.getHex(),
+      snowDirty: p.snowDirty.value.getHex(),
+    },
+    clouds: {
+      visible: clouds.visible,
+      scale: c.cloudScale.value,
+      density: c.cloudDensity.value,
+      sharpness: c.cloudSharpness.value,
+      opacity: c.cloudOpacity.value,
+      color: c.cloudColor.value.getHex(),
+    },
+    atmosphere: {
+      visible: atmosphere.visible,
+      color: a.atmosphereColor.value.getHex(),
+      twilightColor: a.twilightColor.value.getHex(),
+      glowIntensity: a.glowIntensity.value,
+      glowCoefficient: a.glowCoefficient.value,
+      glowPower: a.glowPower.value,
+    },
+    rings: {
+      visible: rings.visible,
+      colors: [r.ringColor1.value.getHex(), r.ringColor2.value.getHex(), r.ringColor3.value.getHex()],
+      opacity: r.ringOpacity.value,
+      bandFreq: r.bandFreq.value,
+      bandFreq2: r.bandFreq2.value,
+      gaps: [
+        r.gapPos1.value, r.gapWidth1.value,
+        r.gapPos2.value, r.gapWidth2.value,
+        r.gapPos3.value, r.gapWidth3.value,
+      ],
+      innerTrim: r.innerTrim.value,
+      outerTrim: r.outerTrim.value,
+      densityVar: r.densityVar.value,
+      rotationX: rings.rotation.x,
+    },
+    transform: {
+      scale: { x: planetGroup.scale.x, y: planetGroup.scale.y, z: planetGroup.scale.z },
+      axialTilt: planetGroup.rotation.z,
+    },
+    lighting: {
+      sunDirection: { x: p.sunDirection.value.x, y: p.sunDirection.value.y, z: p.sunDirection.value.z },
+    },
+  }
+}
+
+export function applyConfig(cfg: PlanetConfig) {
+  const p = planetUniforms
+  const c = cloudUniformsRef
+  const a = atmosUniformsRef
+  const r = ringUniformsRef
+
+  // Category & seed
+  p.planetCategory.value = cfg.category
+  p.seed.value.set(cfg.seed.x, cfg.seed.y, cfg.seed.z)
+
+  // Terrain
+  p.noiseScale.value = cfg.terrain.noiseScale
+  p.lacunarity.value = cfg.terrain.lacunarity
+  p.gain.value = cfg.terrain.gain
+  p.terrainHeight.value = cfg.terrain.terrainHeight
+  p.seaLevel.value = cfg.terrain.seaLevel
+  p.warpStrength.value = cfg.terrain.warpStrength
+  p.ridgeStrength.value = cfg.terrain.ridgeStrength
+  p.erosionStrength.value = cfg.terrain.erosionStrength
+  p.terrainPower.value = cfg.terrain.terrainPower
+  p.moistureScale.value = cfg.terrain.moistureScale
+  p.moistureOffset.value.set(cfg.terrain.moistureOffset.x, cfg.terrain.moistureOffset.y, cfg.terrain.moistureOffset.z)
+  p.bumpStrength.value = cfg.terrain.bumpStrength
+  p.worleyBlend.value = cfg.terrain.worleyBlend
+
+  // Biome colors
+  const biomeKeys = [
+    'deepOcean', 'midOcean', 'shallowWater', 'coast',
+    'sand', 'sand2', 'savanna', 'savanna2',
+    'grass', 'grass2', 'forest', 'forest2',
+    'rock', 'rock2', 'snow', 'snowDirty',
+  ] as const
+  for (const key of biomeKeys) {
+    (p as any)[key].value.set(cfg.biome[key])
+  }
+
+  // Clouds
+  clouds.visible = cfg.clouds.visible
+  c.cloudScale.value = cfg.clouds.scale
+  c.cloudDensity.value = cfg.clouds.density
+  c.cloudSharpness.value = cfg.clouds.sharpness
+  c.cloudOpacity.value = cfg.clouds.opacity
+  c.cloudColor.value.set(cfg.clouds.color)
+
+  // Atmosphere
+  atmosphere.visible = cfg.atmosphere.visible
+  a.atmosphereColor.value.set(cfg.atmosphere.color)
+  a.twilightColor.value.set(cfg.atmosphere.twilightColor)
+  a.glowIntensity.value = cfg.atmosphere.glowIntensity
+  a.glowCoefficient.value = cfg.atmosphere.glowCoefficient
+  a.glowPower.value = cfg.atmosphere.glowPower
+
+  // Rings
+  rings.visible = cfg.rings.visible
+  r.ringColor1.value.set(cfg.rings.colors[0])
+  r.ringColor2.value.set(cfg.rings.colors[1])
+  r.ringColor3.value.set(cfg.rings.colors[2])
+  r.ringOpacity.value = cfg.rings.opacity
+  r.bandFreq.value = cfg.rings.bandFreq
+  r.bandFreq2.value = cfg.rings.bandFreq2
+  r.gapPos1.value = cfg.rings.gaps[0]
+  r.gapWidth1.value = cfg.rings.gaps[1]
+  r.gapPos2.value = cfg.rings.gaps[2]
+  r.gapWidth2.value = cfg.rings.gaps[3]
+  r.gapPos3.value = cfg.rings.gaps[4]
+  r.gapWidth3.value = cfg.rings.gaps[5]
+  r.innerTrim.value = cfg.rings.innerTrim
+  r.outerTrim.value = cfg.rings.outerTrim
+  r.densityVar.value = cfg.rings.densityVar
+  rings.rotation.x = cfg.rings.rotationX
+
+  // Transform
+  planetGroup.scale.set(cfg.transform.scale.x, cfg.transform.scale.y, cfg.transform.scale.z)
+  planetGroup.rotation.x = 0
+  planetGroup.rotation.z = cfg.transform.axialTilt
+
+  // Lighting
+  const sunDir = new Vector3(cfg.lighting.sunDirection.x, cfg.lighting.sunDirection.y, cfg.lighting.sunDirection.z)
+  p.sunDirection.value.copy(sunDir).normalize()
+  sun.position.copy(sunDir.normalize().multiplyScalar(5))
+  sunFlare.position.copy(p.sunDirection.value).multiplyScalar(50)
+  refreshGui()
+}
+
+// ---------------------------------------------------------------------------
 // Init
 // ---------------------------------------------------------------------------
 
@@ -350,7 +533,6 @@ export async function init() {
   // Post-processing
   postProcessing = new PostProcessing(renderer)
   scenePass = pass(scene, camera)
-  scenePass.setMRT(mrt({ output, normal: normalView, metalness }))
   initPasses()
   buildPostProcessing()
 
@@ -441,7 +623,6 @@ function animate() {
   clouds.rotation.y += 0.001
   atmosphere.rotation.y += 0.00067
 
-  planetUniforms.cloudRotationY.value = clouds.rotation.y - planet.rotation.y
   cloudUniformsRef.uTime.value += 0.016
 
   controls.update()

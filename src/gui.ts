@@ -1,5 +1,6 @@
 import GUI from 'lil-gui'
 import type { Vector3, Color } from 'three'
+import { GUI_LIMITS as L } from './ranges'
 
 interface PlanetUniforms {
   planetCategory: { value: number }
@@ -11,6 +12,10 @@ interface PlanetUniforms {
   warpStrength: { value: number }
   ridgeStrength: { value: number }
   erosionStrength: { value: number }
+  terrainPower: { value: number }
+  moistureScale: { value: number }
+  bumpStrength: { value: number }
+  worleyBlend: { value: number }
   sunDirection: { value: Vector3 }
   seed: { value: Vector3 }
 }
@@ -74,6 +79,10 @@ export function refreshGui() {
   guiParams.warpStrength = p.warpStrength.value
   guiParams.ridgeStrength = p.ridgeStrength.value
   guiParams.erosionStrength = p.erosionStrength.value
+  guiParams.terrainPower = p.terrainPower.value
+  guiParams.moistureScale = p.moistureScale.value
+  guiParams.bumpStrength = p.bumpStrength.value
+  guiParams.worleyBlend = p.worleyBlend.value
   guiParams.atmosphereColor = '#' + guiAtmosUniforms.atmosphereColor.value.getHexString()
   guiParams.twilightColor = '#' + guiAtmosUniforms.twilightColor.value.getHexString()
   guiParams.glowIntensity = guiAtmosUniforms.glowIntensity.value
@@ -111,6 +120,10 @@ export function setupGui(planetUniforms: PlanetUniforms, atmosUniforms: Atmosphe
     warpStrength: planetUniforms.warpStrength.value,
     ridgeStrength: planetUniforms.ridgeStrength.value,
     erosionStrength: planetUniforms.erosionStrength.value,
+    terrainPower: planetUniforms.terrainPower.value,
+    moistureScale: planetUniforms.moistureScale.value,
+    bumpStrength: planetUniforms.bumpStrength.value,
+    worleyBlend: planetUniforms.worleyBlend.value,
     atmosphereColor: '#' + atmosUniforms.atmosphereColor.value.getHexString(),
     twilightColor: '#' + atmosUniforms.twilightColor.value.getHexString(),
     glowIntensity: atmosUniforms.glowIntensity.value,
@@ -133,15 +146,15 @@ export function setupGui(planetUniforms: PlanetUniforms, atmosUniforms: Atmosphe
   // Noise
   const noiseFolder = gui.addFolder('Noise')
 
-  noiseFolder.add(params, 'noiseScale', 0.5, 10, 0.1).name('Scale').onChange((v: number) => {
+  noiseFolder.add(params, 'noiseScale', L.noiseScale.min, L.noiseScale.max, 0.1).name('Scale').onChange((v: number) => {
     planetUniforms.noiseScale.value = v
   })
 
-  noiseFolder.add(params, 'lacunarity', 1.0, 4.0, 0.1).name('Lacunarity').onChange((v: number) => {
+  noiseFolder.add(params, 'lacunarity', L.lacunarity.min, L.lacunarity.max, 0.1).name('Lacunarity').onChange((v: number) => {
     planetUniforms.lacunarity.value = v
   })
 
-  noiseFolder.add(params, 'gain', 0.1, 0.9, 0.05).name('Gain').onChange((v: number) => {
+  noiseFolder.add(params, 'gain', L.gain.min, L.gain.max, 0.05).name('Gain').onChange((v: number) => {
     planetUniforms.gain.value = v
   })
 
@@ -150,24 +163,40 @@ export function setupGui(planetUniforms: PlanetUniforms, atmosUniforms: Atmosphe
   // Terrain
   const terrainFolder = gui.addFolder('Terrain')
 
-  terrainFolder.add(params, 'terrainHeight', 0.0, 2.0, 0.01).name('Height').onChange((v: number) => {
+  terrainFolder.add(params, 'terrainHeight', L.terrainHeight.min, L.terrainHeight.max, 0.01).name('Height').onChange((v: number) => {
     planetUniforms.terrainHeight.value = v
   })
 
-  terrainFolder.add(params, 'seaLevel', 0.2, 0.7, 0.01).name('Sea Level').onChange((v: number) => {
+  terrainFolder.add(params, 'seaLevel', L.seaLevel.min, L.seaLevel.max, 0.01).name('Sea Level').onChange((v: number) => {
     planetUniforms.seaLevel.value = v
   })
 
-  terrainFolder.add(params, 'warpStrength', 0.0, 5.0, 0.05).name('Warp').onChange((v: number) => {
+  terrainFolder.add(params, 'warpStrength', L.warpStrength.min, L.warpStrength.max, 0.05).name('Warp').onChange((v: number) => {
     planetUniforms.warpStrength.value = v
   })
 
-  terrainFolder.add(params, 'ridgeStrength', 0.0, 0.5, 0.01).name('Ridge Strength').onChange((v: number) => {
+  terrainFolder.add(params, 'ridgeStrength', L.ridgeStrength.min, L.ridgeStrength.max, 0.01).name('Ridge Strength').onChange((v: number) => {
     planetUniforms.ridgeStrength.value = v
   })
 
-  terrainFolder.add(params, 'erosionStrength', 0.0, 1.0, 0.05).name('Erosion').onChange((v: number) => {
+  terrainFolder.add(params, 'erosionStrength', L.erosionStrength.min, L.erosionStrength.max, 0.05).name('Erosion').onChange((v: number) => {
     planetUniforms.erosionStrength.value = v
+  })
+
+  terrainFolder.add(params, 'terrainPower', L.terrainPower.min, L.terrainPower.max, 0.1).name('Power').onChange((v: number) => {
+    planetUniforms.terrainPower.value = v
+  })
+
+  terrainFolder.add(params, 'moistureScale', L.moistureScale.min, L.moistureScale.max, 0.1).name('Moisture').onChange((v: number) => {
+    planetUniforms.moistureScale.value = v
+  })
+
+  terrainFolder.add(params, 'bumpStrength', L.bumpStrength.min, L.bumpStrength.max, 0.05).name('Bump').onChange((v: number) => {
+    planetUniforms.bumpStrength.value = v
+  })
+
+  terrainFolder.add(params, 'worleyBlend', L.worleyBlend.min, L.worleyBlend.max, 0.05).name('Worley').onChange((v: number) => {
+    planetUniforms.worleyBlend.value = v
   })
 
   terrainFolder.open()
@@ -180,21 +209,25 @@ export function setupGui(planetUniforms: PlanetUniforms, atmosUniforms: Atmosphe
 
   cloudFolder.add(visibilityParams, 'showClouds').name('Visible').onChange((v: boolean) => {
     meshes.clouds.visible = v
+
   })
 
-  cloudFolder.add(cloudParams, 'cloudScale', 1.0, 10.0, 0.1).name('Scale').onChange((v: number) => {
+  cloudFolder.add(cloudParams, 'cloudScale', L.cloudScale.min, L.cloudScale.max, 0.1).name('Scale').onChange((v: number) => {
     cloudUniforms.cloudScale.value = v
+
   })
 
-  cloudFolder.add(cloudParams, 'cloudDensity', 0.0, 1.0, 0.01).name('Coverage').onChange((v: number) => {
+  cloudFolder.add(cloudParams, 'cloudDensity', L.cloudDensity.min, L.cloudDensity.max, 0.01).name('Coverage').onChange((v: number) => {
     cloudUniforms.cloudDensity.value = v
+
   })
 
-  cloudFolder.add(cloudParams, 'cloudSharpness', 1.0, 10.0, 0.1).name('Sharpness').onChange((v: number) => {
+  cloudFolder.add(cloudParams, 'cloudSharpness', L.cloudSharpness.min, L.cloudSharpness.max, 0.1).name('Sharpness').onChange((v: number) => {
     cloudUniforms.cloudSharpness.value = v
+
   })
 
-  cloudFolder.add(cloudParams, 'cloudOpacity', 0.0, 1.0, 0.05).name('Opacity').onChange((v: number) => {
+  cloudFolder.add(cloudParams, 'cloudOpacity', L.cloudOpacity.min, L.cloudOpacity.max, 0.05).name('Opacity').onChange((v: number) => {
     cloudUniforms.cloudOpacity.value = v
   })
 
@@ -219,15 +252,15 @@ export function setupGui(planetUniforms: PlanetUniforms, atmosUniforms: Atmosphe
     atmosUniforms.twilightColor.value.set(v)
   })
 
-  atmosFolder.add(params, 'glowIntensity', 0.0, 3.0, 0.05).name('Intensity').onChange((v: number) => {
+  atmosFolder.add(params, 'glowIntensity', L.glowIntensity.min, L.glowIntensity.max, 0.05).name('Intensity').onChange((v: number) => {
     atmosUniforms.glowIntensity.value = v
   })
 
-  atmosFolder.add(params, 'glowCoefficient', 0.0, 1.0, 0.05).name('Coefficient').onChange((v: number) => {
+  atmosFolder.add(params, 'glowCoefficient', L.glowCoefficient.min, L.glowCoefficient.max, 0.05).name('Coefficient').onChange((v: number) => {
     atmosUniforms.glowCoefficient.value = v
   })
 
-  atmosFolder.add(params, 'glowPower', 1.0, 10.0, 0.1).name('Power').onChange((v: number) => {
+  atmosFolder.add(params, 'glowPower', L.glowPower.min, L.glowPower.max, 0.1).name('Power').onChange((v: number) => {
     atmosUniforms.glowPower.value = v
   })
 
@@ -272,18 +305,6 @@ export function setupGui(planetUniforms: PlanetUniforms, atmosUniforms: Atmosphe
   dofFolder.add({ v: dp.focus.value }, 'v', 0.5, 20.0, 0.1).name('Focus Distance').onChange((v: number) => { dp.focus.value = v })
   dofFolder.add({ v: dp.aperture.value }, 'v', 0.0001, 0.01, 0.0001).name('Aperture').onChange((v: number) => { dp.aperture.value = v })
   dofFolder.add({ v: dp.maxblur.value }, 'v', 0.0, 0.05, 0.001).name('Max Blur').onChange((v: number) => { dp.maxblur.value = v })
-
-  // AO
-  const aoFolder = postFolder.addFolder('Ambient Occlusion')
-  aoFolder.add({ enabled: postUniforms.effectToggles.ao }, 'enabled').name('Enabled').onChange((v: boolean) => {
-    postUniforms.toggleEffect('ao', v)
-  })
-
-  // SSR
-  const ssrFolder = postFolder.addFolder('SSR Reflections')
-  ssrFolder.add({ enabled: postUniforms.effectToggles.ssr }, 'enabled').name('Enabled').onChange((v: boolean) => {
-    postUniforms.toggleEffect('ssr', v)
-  })
 
   postFolder.open()
 
