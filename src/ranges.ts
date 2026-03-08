@@ -64,10 +64,10 @@ export const ROCKY_RANGES = {
 // ---------------------------------------------------------------------------
 
 export const GAS_RANGES = {
-  noiseScale:    { min: 1.5, max: 3.0 },
-  lacunarity:    { min: 1.72, max: 2.12 },
+  noiseScale:    { min: 1.8, max: 3.5 },
+  lacunarity:    { min: 2.0, max: 2.5 },
   gain:          { min: 0.4, max: 0.6 },
-  warpStrength:  { min: 0.6, max: 1.4 },
+  warpStrength:  { min: 0.15, max: 1.6 },  // low=clean bands (Saturn), high=stormy (Jupiter)
   ringChance:    0.5,
 }
 

@@ -168,30 +168,41 @@ export function createPlanetMaterial() {
   })
 
   // --- Gas giant banded coloring ---
+  // Low warp → clean horizontal bands (Saturn-like)
+  // High warp → turbulent storms (Jupiter-like)
   const getGasColor = Fn(([pos]) => {
     const wp = warpedPos(pos)
     const lat = pos.y // latitude proxy [-1, 1]
+    const warp = uniforms.warpStrength
 
-    // Turbulent distortion of latitude for storms
-    const turbulence = noise3D(wp.mul(2.0)).sub(0.5).mul(uniforms.warpStrength.mul(0.3))
-    const distortedLat = lat.add(turbulence)
+    // Turbulence distortion scales with warp — calm planets keep clean bands
+    const turb = noise3D(wp.mul(2.5)).sub(0.5).mul(warp.mul(0.3))
+    const distortedLat = lat.add(turb)
 
-    // Band pattern: high-frequency noise along latitude
-    const bandCoord = vec3(distortedLat.mul(8.0), float(0.0), float(0.0))
-    const band = noise3D(bandCoord)
+    // Wide bands always present + fine sub-bands more visible at low warp
+    const bandWide = noise3D(vec3(distortedLat.mul(6.0), float(0.0), float(0.0)))
+    const bandFine = noise3D(vec3(distortedLat.mul(20.0), float(0.5), float(0.0)))
+    const fineWeight = float(0.45).sub(warp.mul(0.15)).max(0.1) // 0.1–0.45: more fine detail at low warp
+    const band = bandWide.mul(float(1.0).sub(fineWeight)).add(bandFine.mul(fineWeight))
 
-    // Storm detail overlay
-    const stormDetail = noise3D(wp.mul(4.0)).mul(0.3)
+    // Storm detail scales with warp — quiet at low warp, strong at high
+    const storm = noise3D(wp.mul(5.0)).sub(0.5).mul(warp.mul(0.4))
 
-    // 3-color band system using biome uniforms
-    const col = vec3(uniforms.sand).toVar() // base band color
-    col.assign(mix(col, vec3(uniforms.savanna), smoothstep(0.3, 0.5, band)))
-    col.assign(mix(col, vec3(uniforms.rock),    smoothstep(0.55, 0.75, band)))
-    col.assign(mix(col, vec3(uniforms.forest),  smoothstep(0.7, 0.9, band.add(stormDetail))))
+    // 5-color band system
+    const col = vec3(uniforms.deepOcean).toVar()
+    col.assign(mix(col, vec3(uniforms.sand),    smoothstep(0.2, 0.35, band)))
+    col.assign(mix(col, vec3(uniforms.savanna), smoothstep(0.35, 0.48, band)))
+    col.assign(mix(col, vec3(uniforms.grass),   smoothstep(0.48, 0.58, band.add(storm.mul(0.5)))))
+    col.assign(mix(col, vec3(uniforms.rock),    smoothstep(0.58, 0.7, band)))
+    col.assign(mix(col, vec3(uniforms.forest),  smoothstep(0.7, 0.85, band.add(storm.mul(0.7)))))
+
+    // Brightness variation — subtle at low warp, stronger at high
+    const brightVar = storm.mul(0.3).add(0.95)
+    col.assign(col.mul(brightVar))
 
     // Polar darkening
-    const polarFade = smoothstep(0.85, 1.0, abs(lat))
-    col.assign(mix(col, col.mul(0.6), polarFade))
+    const polarFade = smoothstep(0.8, 1.0, abs(lat))
+    col.assign(mix(col, col.mul(0.55), polarFade))
 
     return col
   })
