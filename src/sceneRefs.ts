@@ -2,7 +2,8 @@
 // Shared scene references — typed interface for cross-module access
 // ---------------------------------------------------------------------------
 
-import type { Mesh, Group, DirectionalLight } from 'three/webgpu'
+import type { Mesh, Group, DirectionalLight, AmbientLight, Points } from 'three/webgpu'
+import type { PostProcessingState } from './postProcessing'
 import type { createPlanetMaterial } from './shaders/planet'
 import type { createCloudMaterial } from './shaders/clouds'
 import type { createAtmosphereMaterial } from './shaders/atmosphere'
@@ -21,4 +22,7 @@ export interface SceneRefs {
   cloudUniforms: ReturnType<typeof createCloudMaterial>['uniforms']
   atmosUniforms: ReturnType<typeof createAtmosphereMaterial>['uniforms']
   ringUniforms: ReturnType<typeof createRingMaterial>['uniforms']
+  starfield: Points
+  ambientLight: AmbientLight
+  pp: PostProcessingState
 }

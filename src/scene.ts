@@ -79,14 +79,16 @@ export async function init() {
   const sun = new DirectionalLight(0xffffff, 1.8)
   sun.position.set(5, 3, 5)
   scene.add(sun)
-  scene.add(new AmbientLight(0x404060, 0.3))
+  const ambientLight = new AmbientLight(0x404060, 0.3)
+  scene.add(ambientLight)
 
   const sunFlare = createSunFlare()
   sunFlare.position.copy(new Vector3().copy(sun.position).normalize().multiplyScalar(50))
   scene.add(sunFlare)
 
   // Stars
-  scene.add(createStarfield())
+  const starfield = createStarfield()
+  scene.add(starfield)
 
   // Planet group
   const planetGroup = new Group()
@@ -134,32 +136,44 @@ export async function init() {
     cloudUniforms,
     atmosUniforms,
     ringUniforms,
+    starfield,
+    ambientLight,
+    pp,
   }
 
-  // GUI
-  const guiRef = setupGui(
-    planetResult.uniforms, atmosUniforms, cloudUniforms, planetResult.uniforms as any,
-    {
-      passes: pp.passes, rawNodes: pp.rawNodes as any, renderer,
-      toggleEffect: (name: string, enabled: boolean) => toggleEffect(pp, name, enabled),
-      togglePostProcessing: (enabled: boolean) => togglePostProcessing(pp, enabled),
-      effectToggles: pp.effectToggles, postProcessingEnabled: pp.enabled,
-    },
-    { clouds, atmosphere },
-    () => randomizePlanet(refs),
-  )
-  if (guiRef && !__DEV__) guiRef.hide()
-  window.addEventListener('keydown', (e) => {
-    if (e.key === 'o' || e.key === 'O') {
-      if (guiRef) guiRef._hidden ? guiRef.show() : guiRef.hide()
-    }
-    if (e.key === 'r' || e.key === 'R') {
-      randomizePlanet(refs)
-    }
-  })
+  // Showcase mode or normal mode
+  const isShowcase = new URLSearchParams(window.location.search).has('showcase')
 
-  // Randomize bar
-  createRandomizeBar(refs)
+  if (isShowcase) {
+    randomizePlanet(refs)
+    const { initShowcase } = await import('./showcase')
+    initShowcase(refs)
+  } else {
+    // GUI
+    const guiRef = setupGui(
+      planetResult.uniforms, atmosUniforms, cloudUniforms, planetResult.uniforms as any,
+      {
+        passes: pp.passes, rawNodes: pp.rawNodes as any, renderer,
+        toggleEffect: (name: string, enabled: boolean) => toggleEffect(pp, name, enabled),
+        togglePostProcessing: (enabled: boolean) => togglePostProcessing(pp, enabled),
+        effectToggles: pp.effectToggles, postProcessingEnabled: pp.enabled,
+      },
+      { clouds, atmosphere },
+      () => randomizePlanet(refs),
+    )
+    if (guiRef && !__DEV__) guiRef.hide()
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'o' || e.key === 'O') {
+        if (guiRef) guiRef._hidden ? guiRef.show() : guiRef.hide()
+      }
+      if (e.key === 'r' || e.key === 'R') {
+        randomizePlanet(refs)
+      }
+    })
+
+    // Randomize bar
+    createRandomizeBar(refs)
+  }
 
   window.addEventListener('resize', onResize)
   renderer.setAnimationLoop(animate)
