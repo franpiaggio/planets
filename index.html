@@ -58,6 +58,86 @@
       .randomize-btn:hover {
         background: rgba(255, 255, 255, 0.22);
       }
+
+      /* Screenshot button */
+      .screenshot-btn {
+        padding: 10px 12px;
+        font-size: 16px;
+        border: none;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.12);
+        color: #fff;
+        cursor: pointer;
+        backdrop-filter: blur(8px);
+        transition: background 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .screenshot-btn:hover {
+        background: rgba(255, 255, 255, 0.22);
+      }
+
+      /* Fullscreen toggle */
+      .fullscreen-btn {
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        width: 40px;
+        height: 40px;
+        border: none;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.12);
+        color: #fff;
+        cursor: pointer;
+        backdrop-filter: blur(8px);
+        transition: background 0.2s, opacity 0.3s;
+        z-index: 100;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .fullscreen-btn:hover {
+        background: rgba(255, 255, 255, 0.22);
+      }
+      .fullscreen-btn svg {
+        width: 18px;
+        height: 18px;
+      }
+
+      /* Exit fullscreen — small icon top-right */
+      .exit-fullscreen-btn {
+        position: fixed;
+        top: 16px;
+        right: 16px;
+        width: 32px;
+        height: 32px;
+        border: none;
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.08);
+        color: rgba(255, 255, 255, 0.5);
+        cursor: pointer;
+        backdrop-filter: blur(8px);
+        transition: background 0.2s, color 0.2s, opacity 0.3s;
+        z-index: 100;
+        display: none;
+        align-items: center;
+        justify-content: center;
+      }
+      .exit-fullscreen-btn:hover {
+        background: rgba(255, 255, 255, 0.18);
+        color: #fff;
+      }
+      .exit-fullscreen-btn svg {
+        width: 14px;
+        height: 14px;
+      }
+
+      /* Hidden state */
+      body.cinematic .randomize-bar,
+      body.cinematic .fullscreen-btn,
+      body.cinematic .lil-gui { display: none !important; }
+      body.cinematic .exit-fullscreen-btn { display: flex; }
     </style>
   </head>
   <body>

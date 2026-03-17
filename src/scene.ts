@@ -153,6 +153,9 @@ export async function init() {
     if (e.key === 'o' || e.key === 'O') {
       if (guiRef) guiRef._hidden ? guiRef.show() : guiRef.hide()
     }
+    if (e.key === 'r' || e.key === 'R') {
+      randomizePlanet(refs)
+    }
   })
 
   // Randomize bar

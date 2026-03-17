@@ -287,7 +287,50 @@ export function createRandomizeBar(refs: SceneRefs) {
   btn.className = 'randomize-btn'
   btn.addEventListener('click', () => randomizePlanet(refs))
 
+  const screenshotBtn = document.createElement('button')
+  screenshotBtn.className = 'screenshot-btn'
+  screenshotBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'
+  screenshotBtn.addEventListener('click', () => {
+    // Hide all UI, wait a frame for render, capture, restore
+    document.body.classList.add('cinematic')
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const canvas = document.querySelector('canvas')
+        if (canvas) {
+          canvas.toBlob((blob) => {
+            if (!blob) return
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = `planet-${Date.now()}.png`
+            a.click()
+            URL.revokeObjectURL(url)
+          }, 'image/png')
+        }
+        document.body.classList.remove('cinematic')
+      })
+    })
+  })
+
   bar.appendChild(select)
   bar.appendChild(btn)
+  bar.appendChild(screenshotBtn)
   document.body.appendChild(bar)
+
+  // Fullscreen (cinematic) toggle
+  const fullscreenBtn = document.createElement('button')
+  fullscreenBtn.className = 'fullscreen-btn'
+  fullscreenBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/></svg>'
+  fullscreenBtn.addEventListener('click', () => {
+    document.body.classList.add('cinematic')
+  })
+  document.body.appendChild(fullscreenBtn)
+
+  const exitBtn = document.createElement('button')
+  exitBtn.className = 'exit-fullscreen-btn'
+  exitBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3v3a2 2 0 01-2 2H3m18 0h-3a2 2 0 01-2-2V3m0 18v-3a2 2 0 012-2h3M3 16h3a2 2 0 012 2v3"/></svg>'
+  exitBtn.addEventListener('click', () => {
+    document.body.classList.remove('cinematic')
+  })
+  document.body.appendChild(exitBtn)
 }
