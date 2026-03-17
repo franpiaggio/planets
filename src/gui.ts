@@ -18,6 +18,27 @@ interface PlanetUniforms {
   worleyBlend: { value: number }
   sunDirection: { value: Vector3 }
   seed: { value: Vector3 }
+  [key: string]: { value: any }
+}
+
+interface BiomeUniforms {
+  deepOcean: { value: Color }
+  midOcean: { value: Color }
+  shallowWater: { value: Color }
+  coast: { value: Color }
+  sand: { value: Color }
+  sand2: { value: Color }
+  savanna: { value: Color }
+  savanna2: { value: Color }
+  grass: { value: Color }
+  grass2: { value: Color }
+  forest: { value: Color }
+  forest2: { value: Color }
+  rock: { value: Color }
+  rock2: { value: Color }
+  snow: { value: Color }
+  snowDirty: { value: Color }
+  [key: string]: { value: Color }
 }
 
 interface CloudUniforms {
@@ -62,10 +83,19 @@ let guiInstance: GUI | null = null
 let guiParams: any = null
 let guiCloudParams: any = null
 let guiVisibilityParams: any = null
+let guiBiomeParams: Record<string, string> | null = null
 let guiPlanetUniforms: PlanetUniforms | null = null
 let guiAtmosUniforms: AtmosphereUniforms | null = null
 let guiCloudUniforms: CloudUniforms | null = null
+let guiBiomeUniforms: BiomeUniforms | null = null
 let guiMeshes: MeshVisibility | null = null
+
+const BIOME_KEYS = [
+  'deepOcean', 'midOcean', 'shallowWater', 'coast',
+  'sand', 'sand2', 'savanna', 'savanna2',
+  'grass', 'grass2', 'forest', 'forest2',
+  'rock', 'rock2', 'snow', 'snowDirty',
+] as const
 
 export function refreshGui() {
   if (!guiInstance || !guiParams || !guiPlanetUniforms || !guiAtmosUniforms || !guiCloudUniforms) return
@@ -95,6 +125,12 @@ export function refreshGui() {
   guiCloudParams.cloudOpacity = guiCloudUniforms.cloudOpacity.value
   guiCloudParams.cloudColor = '#' + guiCloudUniforms.cloudColor.value.getHexString()
 
+  if (guiBiomeParams && guiBiomeUniforms) {
+    for (const key of BIOME_KEYS) {
+      guiBiomeParams[key] = '#' + guiBiomeUniforms[key].value.getHexString()
+    }
+  }
+
   if (guiVisibilityParams && guiMeshes) {
     guiVisibilityParams.showClouds = guiMeshes.clouds.visible
     guiVisibilityParams.showAtmosphere = guiMeshes.atmosphere.visible
@@ -103,12 +139,13 @@ export function refreshGui() {
   guiInstance.controllersRecursive().forEach(c => c.updateDisplay())
 }
 
-export function setupGui(planetUniforms: PlanetUniforms, atmosUniforms: AtmosphereUniforms, cloudUniforms: CloudUniforms, postUniforms: PostUniforms, meshes: MeshVisibility, onRandomize: () => void): GUI {
+export function setupGui(planetUniforms: PlanetUniforms, atmosUniforms: AtmosphereUniforms, cloudUniforms: CloudUniforms, biomeUniforms: BiomeUniforms, postUniforms: PostUniforms, meshes: MeshVisibility, onRandomize: () => void): GUI {
   const gui = new GUI({ title: 'Planet Controls' })
   guiInstance = gui
   guiPlanetUniforms = planetUniforms
   guiAtmosUniforms = atmosUniforms
   guiCloudUniforms = cloudUniforms
+  guiBiomeUniforms = biomeUniforms
   guiMeshes = meshes
 
   const params = {
@@ -200,6 +237,43 @@ export function setupGui(planetUniforms: PlanetUniforms, atmosUniforms: Atmosphe
   })
 
   terrainFolder.open()
+
+  // Biome Colors
+  const colorFolder = gui.addFolder('Biome Colors')
+
+  const biomeParams: Record<string, string> = {}
+  for (const key of BIOME_KEYS) {
+    biomeParams[key] = '#' + biomeUniforms[key].value.getHexString()
+  }
+  guiBiomeParams = biomeParams
+
+  const biomeColorHelper = (folder: GUI, key: string, label: string) => {
+    folder.addColor(biomeParams, key).name(label).onChange((v: string) => {
+      biomeUniforms[key].value.set(v)
+    })
+  }
+
+  const oceanSub = colorFolder.addFolder('Ocean')
+  biomeColorHelper(oceanSub, 'deepOcean', 'Deep')
+  biomeColorHelper(oceanSub, 'midOcean', 'Mid')
+  biomeColorHelper(oceanSub, 'shallowWater', 'Shallow')
+  biomeColorHelper(oceanSub, 'coast', 'Coast')
+
+  const landSub = colorFolder.addFolder('Land')
+  biomeColorHelper(landSub, 'sand', 'Sand')
+  biomeColorHelper(landSub, 'sand2', 'Sand 2')
+  biomeColorHelper(landSub, 'savanna', 'Savanna')
+  biomeColorHelper(landSub, 'savanna2', 'Savanna 2')
+  biomeColorHelper(landSub, 'grass', 'Grass')
+  biomeColorHelper(landSub, 'grass2', 'Grass 2')
+  biomeColorHelper(landSub, 'forest', 'Forest')
+  biomeColorHelper(landSub, 'forest2', 'Forest 2')
+
+  const peakSub = colorFolder.addFolder('Peaks')
+  biomeColorHelper(peakSub, 'rock', 'Rock')
+  biomeColorHelper(peakSub, 'rock2', 'Rock 2')
+  biomeColorHelper(peakSub, 'snow', 'Snow')
+  biomeColorHelper(peakSub, 'snowDirty', 'Snow Dirty')
 
   // Clouds
   const cloudFolder = gui.addFolder('Clouds')

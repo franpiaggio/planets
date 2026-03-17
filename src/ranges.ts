@@ -44,7 +44,7 @@ export const GUI_LIMITS = {
 // ---------------------------------------------------------------------------
 
 export const ROCKY_RANGES = {
-  noiseScale:      { min: 1.0, max: 2.7, rareBelow: 1.0, rareChance: 0.1 } as WeightedRange,
+  noiseScale:      { min: 1.8, max: 2.7, rareBelow: 1.5, rareChance: 0.05 } as WeightedRange,
   seaLevel:        { min: 0.25, max: 0.60, rareBelow: 0.25, rareChance: 0.1 } as WeightedRange,
   lacunarity:      { min: 2.50, max: 2.90 },
   gain:            { min: 0.35, max: 0.55 },
@@ -67,7 +67,7 @@ export const GAS_RANGES = {
   noiseScale:    { min: 1.8, max: 3.5 },
   lacunarity:    { min: 2.0, max: 2.5 },
   gain:          { min: 0.4, max: 0.6 },
-  warpStrength:  { min: 0.15, max: 1.6 },  // low=clean bands (Saturn), high=stormy (Jupiter)
+  warpStrength:  { min: 0.1, max: 0.55 },  // keep bands smooth; too high = blobby mess
   ringChance:    0.5,
 }
 
@@ -116,9 +116,9 @@ export const SIZE_RANGES: Record<string, { base: number; range: number; deform: 
 // ---------------------------------------------------------------------------
 
 export const CATEGORY_WEIGHTS = {
-  rocky: 0.50,    // 50%
+  rocky: 0.60,    // 60%
   gas: 0.25,      // 25%
-  liquid: 0.25,   // 25%
+  liquid: 0.15,   // 15%
 }
 
 // ---------------------------------------------------------------------------
