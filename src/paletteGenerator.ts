@@ -91,12 +91,12 @@ export function varyPalette(base: PlanetPalette): PlanetPalette {
 
 /**
  * Pick a palette: always starts from a curated base.
- * 50% exact base, 50% varied version.
+ * 80% exact base, 20% varied version.
  */
 export function pickPalette(category: number): PlanetPalette {
   const compatible = PALETTES.filter(pal => !pal.categories || pal.categories.includes(category))
   const base = compatible[Math.floor(Math.random() * compatible.length)]
 
-  if (Math.random() < 0.5) return base
+  if (Math.random() < 0.8) return base
   return varyPalette(base)
 }

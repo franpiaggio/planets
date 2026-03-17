@@ -11,8 +11,6 @@ import { PALETTES } from '../palettes'
 export const CATEGORY_ROCKY = 1
 export const CATEGORY_GAS = 2
 export const CATEGORY_LIQUID = 3
-export const CATEGORY_LAVA = 4
-
 // ---------------------------------------------------------------------------
 // Shared uniforms — created once, used by all 3 materials
 // ---------------------------------------------------------------------------
@@ -291,110 +289,7 @@ function createLiquidMaterial(uniforms) {
 }
 
 // ---------------------------------------------------------------------------
-// Lava material
-// Dark crust with glowing emissive cracks — worley for cells, FBM for flows
-// ---------------------------------------------------------------------------
-
-function createLavaMaterial(uniforms) {
-  const material = new MeshStandardNodeMaterial()
-  const warpedPos = createWarpedPos(uniforms)
-
-  // Lava-specific elevation for subtle displacement
-  const getElevation = Fn(([pos]) => {
-    const wp = warpedPos(pos)
-    const lac = uniforms.lacunarity
-    const g = uniforms.gain
-    const base = fbm(wp, lac, g)
-    const ridges = ridgedFbm(wp.mul(1.5), lac, g)
-    return base.add(ridges.mul(uniforms.ridgeStrength))
-  })
-
-  // Subtle vertex displacement — cooled lava terrain
-  material.positionNode = Fn(() => {
-    const pos = positionLocal
-    const elevation = getElevation(pos)
-    return pos.add(normalLocal.mul(elevation.sub(0.5).mul(uniforms.terrainHeight.mul(0.5))))
-  })()
-
-  material.colorNode = Fn(() => {
-    const pos = positionLocal
-    const wp = warpedPos(pos)
-    const lac = uniforms.lacunarity
-    const g = uniforms.gain
-
-    // Worley cells — cracks are at cell boundaries
-    const cellDist = worley3D(wp.mul(4.0))
-    const cracks = float(1.0).sub(cellDist)
-    // Sharpen cracks
-    const crackMask = smoothstep(0.3, 0.7, cracks)
-
-    // Large-scale lava flow pattern
-    const flow = fbm(wp, lac, g)
-    const flowDetail = noise3D(pos.add(uniforms.seed).mul(uniforms.noiseScale.mul(3.0)))
-
-    // Hot spots — where lava is freshest (FBM-driven)
-    const hotMask = smoothstep(0.40, 0.55, flow)
-
-    // Crust color — dark basalt with subtle variation
-    const crustCol = mix(
-      vec3(uniforms.rock),
-      vec3(uniforms.rock2),
-      flowDetail
-    )
-
-    // Lava glow color — gradient from deep red to bright yellow
-    const glowBase = mix(
-      vec3(uniforms.deepOcean),   // deep lava (dark red/orange)
-      vec3(uniforms.sand),        // hot lava (bright orange/yellow)
-      crackMask.mul(hotMask)
-    )
-    const glowBright = mix(
-      glowBase,
-      vec3(uniforms.snow),        // white-hot core
-      crackMask.mul(hotMask).mul(crackMask).mul(0.4)
-    )
-
-    // Blend crust and glow
-    const lavaStrength = crackMask.mul(0.7).add(hotMask.mul(0.3))
-    const col = mix(crustCol, glowBright, lavaStrength.mul(0.8))
-
-    return col
-  })()
-
-  // Emissive — cracks glow in the dark
-  material.emissiveNode = Fn(() => {
-    const pos = positionLocal
-    const wp = warpedPos(pos)
-    const lac = uniforms.lacunarity
-    const g = uniforms.gain
-
-    const cellDist = worley3D(wp.mul(4.0))
-    const cracks = smoothstep(0.3, 0.7, float(1.0).sub(cellDist))
-
-    const flow = fbm(wp, lac, g)
-    const hotMask = smoothstep(0.40, 0.55, flow)
-
-    // Emissive intensity — strongest at hot cracks
-    const intensity = cracks.mul(hotMask).mul(1.5)
-
-    // Emissive color: deep red to bright orange
-    const emCol = mix(
-      vec3(uniforms.deepOcean),
-      vec3(uniforms.sand),
-      cracks.mul(hotMask)
-    )
-
-    return emCol.mul(intensity)
-  })()
-
-  material.roughnessNode = float(0.92)
-  material.metalnessNode = float(0.0)
-
-  return material
-}
-
-// ---------------------------------------------------------------------------
-// Public API — creates uniforms + 4 materials, returns swap helper
+// Public API — creates uniforms + 3 materials, returns swap helper
 // ---------------------------------------------------------------------------
 
 export function createPlanetMaterial() {
@@ -405,7 +300,6 @@ export function createPlanetMaterial() {
     [CATEGORY_ROCKY]:   createRockyMaterial(uniforms),
     [CATEGORY_GAS]:     createGasMaterial(uniforms),
     [CATEGORY_LIQUID]:  createLiquidMaterial(uniforms),
-    [CATEGORY_LAVA]:    createLavaMaterial(uniforms),
   }
 
   return {

@@ -1,7 +1,7 @@
 import GUI from 'lil-gui'
 import type { Vector3, Color } from 'three'
 import { GUI_LIMITS as L } from './ranges'
-import { CATEGORY_ROCKY, CATEGORY_GAS, CATEGORY_LIQUID, CATEGORY_LAVA } from './shaders/planet'
+import { CATEGORY_ROCKY, CATEGORY_GAS, CATEGORY_LIQUID } from './shaders/planet'
 
 interface PlanetUniforms {
   planetCategory: { value: number }
@@ -108,7 +108,6 @@ const CATEGORY_PARAMS: Record<number, Set<string>> = {
   [CATEGORY_ROCKY]:   new Set(['terrainHeight', 'seaLevel', 'warpStrength', 'ridgeStrength', 'erosionStrength', 'terrainPower', 'moistureScale', 'bumpStrength', 'worleyBlend']),
   [CATEGORY_GAS]:     new Set(['warpStrength']),
   [CATEGORY_LIQUID]:  new Set(['warpStrength']),
-  [CATEGORY_LAVA]:    new Set(['terrainHeight', 'warpStrength', 'ridgeStrength', 'worleyBlend']),
 }
 
 // Which categories show clouds folder
