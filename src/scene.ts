@@ -108,7 +108,7 @@ export async function init() {
   const atmosphere = new Mesh(new SphereGeometry(1.09, 64, 64), atmosMat)
   planetGroup.add(atmosphere)
 
-  // Inner glow on all 3 materials
+  // Inner glow on each planet material variant (rocky, gas, liquid)
   for (const mat of Object.values(planetResult.materials)) {
     applyInnerGlow(mat, planetResult.uniforms, atmosUniforms)
   }

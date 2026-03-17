@@ -117,8 +117,7 @@ function updateVisibility(category: number) {
   const allowed = CATEGORY_PARAMS[category] || CATEGORY_PARAMS[CATEGORY_ROCKY]
 
   // Show/hide individual terrain controllers
-  const terrainKeys = ['terrainHeight', 'seaLevel', 'warpStrength', 'ridgeStrength', 'erosionStrength', 'terrainPower', 'moistureScale', 'bumpStrength', 'worleyBlend']
-  for (const key of terrainKeys) {
+  for (const key of Object.keys(controllers)) {
     if (controllers[key]) {
       if (allowed.has(key)) controllers[key].show()
       else controllers[key].hide()
@@ -313,7 +312,7 @@ export function setupGui(planetUniforms: PlanetUniforms, atmosUniforms: Atmosphe
   biomeColorHelper(peakSub, 'snow', 'Snow')
   biomeColorHelper(peakSub, 'snowDirty', 'Snow Dirty')
 
-  // Clouds (hidden for gas, lava)
+  // Clouds (hidden for gas)
   cloudFolder = gui.addFolder('Clouds')
 
   const visibilityParams = { showClouds: meshes.clouds.visible, showAtmosphere: meshes.atmosphere.visible }
