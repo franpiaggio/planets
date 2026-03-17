@@ -1,6 +1,7 @@
 import GUI from 'lil-gui'
 import type { Vector3, Color } from 'three'
 import { GUI_LIMITS as L } from './ranges'
+import { CATEGORY_ROCKY, CATEGORY_GAS, CATEGORY_LIQUID, CATEGORY_LAVA } from './shaders/planet'
 
 interface PlanetUniforms {
   planetCategory: { value: number }
@@ -90,12 +91,47 @@ let guiCloudUniforms: CloudUniforms | null = null
 let guiBiomeUniforms: BiomeUniforms | null = null
 let guiMeshes: MeshVisibility | null = null
 
+// Controller/folder references for category-based visibility
+let terrainFolder: GUI | null = null
+let cloudFolder: GUI | null = null
+let controllers: Record<string, any> = {}
+
 const BIOME_KEYS = [
   'deepOcean', 'midOcean', 'shallowWater', 'coast',
   'sand', 'sand2', 'savanna', 'savanna2',
   'grass', 'grass2', 'forest', 'forest2',
   'rock', 'rock2', 'snow', 'snowDirty',
 ] as const
+
+// Which terrain params each category uses
+const CATEGORY_PARAMS: Record<number, Set<string>> = {
+  [CATEGORY_ROCKY]:   new Set(['terrainHeight', 'seaLevel', 'warpStrength', 'ridgeStrength', 'erosionStrength', 'terrainPower', 'moistureScale', 'bumpStrength', 'worleyBlend']),
+  [CATEGORY_GAS]:     new Set(['warpStrength']),
+  [CATEGORY_LIQUID]:  new Set(['warpStrength']),
+  [CATEGORY_LAVA]:    new Set(['terrainHeight', 'warpStrength', 'ridgeStrength', 'worleyBlend']),
+}
+
+// Which categories show clouds folder
+const CLOUD_CATEGORIES = new Set([CATEGORY_ROCKY, CATEGORY_LIQUID])
+
+function updateVisibility(category: number) {
+  const allowed = CATEGORY_PARAMS[category] || CATEGORY_PARAMS[CATEGORY_ROCKY]
+
+  // Show/hide individual terrain controllers
+  const terrainKeys = ['terrainHeight', 'seaLevel', 'warpStrength', 'ridgeStrength', 'erosionStrength', 'terrainPower', 'moistureScale', 'bumpStrength', 'worleyBlend']
+  for (const key of terrainKeys) {
+    if (controllers[key]) {
+      if (allowed.has(key)) controllers[key].show()
+      else controllers[key].hide()
+    }
+  }
+
+  // Show/hide clouds folder
+  if (cloudFolder) {
+    if (CLOUD_CATEGORIES.has(category)) cloudFolder.show()
+    else cloudFolder.hide()
+  }
+}
 
 export function refreshGui() {
   if (!guiInstance || !guiParams || !guiPlanetUniforms || !guiAtmosUniforms || !guiCloudUniforms) return
@@ -135,6 +171,9 @@ export function refreshGui() {
     guiVisibilityParams.showClouds = guiMeshes.clouds.visible
     guiVisibilityParams.showAtmosphere = guiMeshes.atmosphere.visible
   }
+
+  // Update visibility based on current category
+  updateVisibility(p.planetCategory.value)
 
   guiInstance.controllersRecursive().forEach(c => c.updateDisplay())
 }
@@ -180,7 +219,7 @@ export function setupGui(planetUniforms: PlanetUniforms, atmosUniforms: Atmosphe
 
   gui.add({ randomize: onRandomize }, 'randomize').name('🎲 Randomize Planet')
 
-  // Noise
+  // Noise (always visible — shared by all)
   const noiseFolder = gui.addFolder('Noise')
 
   noiseFolder.add(params, 'noiseScale', L.noiseScale.min, L.noiseScale.max, 0.1).name('Scale').onChange((v: number) => {
@@ -197,42 +236,42 @@ export function setupGui(planetUniforms: PlanetUniforms, atmosUniforms: Atmosphe
 
   noiseFolder.open()
 
-  // Terrain
-  const terrainFolder = gui.addFolder('Terrain')
+  // Terrain (controllers individually shown/hidden per category)
+  terrainFolder = gui.addFolder('Terrain')
 
-  terrainFolder.add(params, 'terrainHeight', L.terrainHeight.min, L.terrainHeight.max, 0.01).name('Height').onChange((v: number) => {
+  controllers.terrainHeight = terrainFolder.add(params, 'terrainHeight', L.terrainHeight.min, L.terrainHeight.max, 0.01).name('Height').onChange((v: number) => {
     planetUniforms.terrainHeight.value = v
   })
 
-  terrainFolder.add(params, 'seaLevel', L.seaLevel.min, L.seaLevel.max, 0.01).name('Sea Level').onChange((v: number) => {
+  controllers.seaLevel = terrainFolder.add(params, 'seaLevel', L.seaLevel.min, L.seaLevel.max, 0.01).name('Sea Level').onChange((v: number) => {
     planetUniforms.seaLevel.value = v
   })
 
-  terrainFolder.add(params, 'warpStrength', L.warpStrength.min, L.warpStrength.max, 0.05).name('Warp').onChange((v: number) => {
+  controllers.warpStrength = terrainFolder.add(params, 'warpStrength', L.warpStrength.min, L.warpStrength.max, 0.05).name('Warp').onChange((v: number) => {
     planetUniforms.warpStrength.value = v
   })
 
-  terrainFolder.add(params, 'ridgeStrength', L.ridgeStrength.min, L.ridgeStrength.max, 0.01).name('Ridge Strength').onChange((v: number) => {
+  controllers.ridgeStrength = terrainFolder.add(params, 'ridgeStrength', L.ridgeStrength.min, L.ridgeStrength.max, 0.01).name('Ridge Strength').onChange((v: number) => {
     planetUniforms.ridgeStrength.value = v
   })
 
-  terrainFolder.add(params, 'erosionStrength', L.erosionStrength.min, L.erosionStrength.max, 0.05).name('Erosion').onChange((v: number) => {
+  controllers.erosionStrength = terrainFolder.add(params, 'erosionStrength', L.erosionStrength.min, L.erosionStrength.max, 0.05).name('Erosion').onChange((v: number) => {
     planetUniforms.erosionStrength.value = v
   })
 
-  terrainFolder.add(params, 'terrainPower', L.terrainPower.min, L.terrainPower.max, 0.1).name('Power').onChange((v: number) => {
+  controllers.terrainPower = terrainFolder.add(params, 'terrainPower', L.terrainPower.min, L.terrainPower.max, 0.1).name('Power').onChange((v: number) => {
     planetUniforms.terrainPower.value = v
   })
 
-  terrainFolder.add(params, 'moistureScale', L.moistureScale.min, L.moistureScale.max, 0.1).name('Moisture').onChange((v: number) => {
+  controllers.moistureScale = terrainFolder.add(params, 'moistureScale', L.moistureScale.min, L.moistureScale.max, 0.1).name('Moisture').onChange((v: number) => {
     planetUniforms.moistureScale.value = v
   })
 
-  terrainFolder.add(params, 'bumpStrength', L.bumpStrength.min, L.bumpStrength.max, 0.05).name('Bump').onChange((v: number) => {
+  controllers.bumpStrength = terrainFolder.add(params, 'bumpStrength', L.bumpStrength.min, L.bumpStrength.max, 0.05).name('Bump').onChange((v: number) => {
     planetUniforms.bumpStrength.value = v
   })
 
-  terrainFolder.add(params, 'worleyBlend', L.worleyBlend.min, L.worleyBlend.max, 0.05).name('Worley').onChange((v: number) => {
+  controllers.worleyBlend = terrainFolder.add(params, 'worleyBlend', L.worleyBlend.min, L.worleyBlend.max, 0.05).name('Worley').onChange((v: number) => {
     planetUniforms.worleyBlend.value = v
   })
 
@@ -275,30 +314,26 @@ export function setupGui(planetUniforms: PlanetUniforms, atmosUniforms: Atmosphe
   biomeColorHelper(peakSub, 'snow', 'Snow')
   biomeColorHelper(peakSub, 'snowDirty', 'Snow Dirty')
 
-  // Clouds
-  const cloudFolder = gui.addFolder('Clouds')
+  // Clouds (hidden for gas, lava)
+  cloudFolder = gui.addFolder('Clouds')
 
   const visibilityParams = { showClouds: meshes.clouds.visible, showAtmosphere: meshes.atmosphere.visible }
   guiVisibilityParams = visibilityParams
 
   cloudFolder.add(visibilityParams, 'showClouds').name('Visible').onChange((v: boolean) => {
     meshes.clouds.visible = v
-
   })
 
   cloudFolder.add(cloudParams, 'cloudScale', L.cloudScale.min, L.cloudScale.max, 0.1).name('Scale').onChange((v: number) => {
     cloudUniforms.cloudScale.value = v
-
   })
 
   cloudFolder.add(cloudParams, 'cloudDensity', L.cloudDensity.min, L.cloudDensity.max, 0.01).name('Coverage').onChange((v: number) => {
     cloudUniforms.cloudDensity.value = v
-
   })
 
   cloudFolder.add(cloudParams, 'cloudSharpness', L.cloudSharpness.min, L.cloudSharpness.max, 0.1).name('Sharpness').onChange((v: number) => {
     cloudUniforms.cloudSharpness.value = v
-
   })
 
   cloudFolder.add(cloudParams, 'cloudOpacity', L.cloudOpacity.min, L.cloudOpacity.max, 0.05).name('Opacity').onChange((v: number) => {
@@ -381,6 +416,9 @@ export function setupGui(planetUniforms: PlanetUniforms, atmosUniforms: Atmosphe
   dofFolder.add({ v: dp.maxblur.value }, 'v', 0.0, 0.05, 0.001).name('Max Blur').onChange((v: number) => { dp.maxblur.value = v })
 
   postFolder.open()
+
+  // Set initial visibility
+  updateVisibility(planetUniforms.planetCategory.value)
 
   return gui
 }

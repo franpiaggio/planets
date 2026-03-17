@@ -3,14 +3,14 @@
 // ---------------------------------------------------------------------------
 
 import { Vector3 } from 'three/webgpu'
-import { CATEGORY_ROCKY, CATEGORY_GAS, CATEGORY_LIQUID } from './shaders/planet'
+import { CATEGORY_ROCKY, CATEGORY_GAS, CATEGORY_LIQUID, CATEGORY_LAVA } from './shaders/planet'
 import { RING_STYLES } from './shaders/rings'
 import { PALETTES } from './palettes'
 import type { PlanetPalette } from './palettes'
-import { generatePalette } from './paletteGenerator'
+import { pickPalette } from './paletteGenerator'
 import { refreshGui } from './gui'
 import {
-  ROCKY_RANGES, GAS_RANGES, LIQUID_RANGES, SHARED_RANGES, SIZE_RANGES,
+  ROCKY_RANGES, GAS_RANGES, LIQUID_RANGES, LAVA_RANGES, SHARED_RANGES, SIZE_RANGES,
   CATEGORY_WEIGHTS, randomInRange, randomWeighted,
 } from './ranges'
 import type { SceneRefs } from './sceneRefs'
@@ -34,7 +34,8 @@ function pickCategory(): number {
   const r = Math.random()
   if (r < CATEGORY_WEIGHTS.rocky) return CATEGORY_ROCKY
   if (r < CATEGORY_WEIGHTS.rocky + CATEGORY_WEIGHTS.gas) return CATEGORY_GAS
-  return CATEGORY_LIQUID
+  if (r < CATEGORY_WEIGHTS.rocky + CATEGORY_WEIGHTS.gas + CATEGORY_WEIGHTS.liquid) return CATEGORY_LIQUID
+  return CATEGORY_LAVA
 }
 
 // ---------------------------------------------------------------------------
@@ -118,7 +119,7 @@ function randomizeRocky(refs: SceneRefs) {
   p.worleyBlend.value = randomInRange(r.worleyBlend)
 
   refs.clouds.visible = Math.random() < 0.6
-  refs.atmosphere.visible = Math.random() < 0.6
+  refs.atmosphere.visible = true
   refs.rings.visible = Math.random() < r.ringChance
 }
 
@@ -159,6 +160,24 @@ function randomizeLiquid(refs: SceneRefs) {
   refs.rings.visible = false
 }
 
+function randomizeLava(refs: SceneRefs) {
+  const r = LAVA_RANGES
+  const p = refs.planetUniforms
+
+  p.noiseScale.value = randomInRange(r.noiseScale)
+  p.lacunarity.value = randomInRange(r.lacunarity)
+  p.gain.value = randomInRange(r.gain)
+  p.terrainHeight.value = randomInRange(r.terrainHeight)
+  p.warpStrength.value = randomInRange(r.warpStrength)
+  p.ridgeStrength.value = randomInRange(r.ridgeStrength)
+  p.erosionStrength.value = 0
+  p.worleyBlend.value = randomInRange(r.worleyBlend)
+
+  refs.clouds.visible = false
+  refs.atmosphere.visible = true
+  refs.rings.visible = Math.random() < r.ringChance
+}
+
 // ---------------------------------------------------------------------------
 // Main randomization entry point
 // ---------------------------------------------------------------------------
@@ -179,17 +198,15 @@ export function randomizePlanet(refs: SceneRefs) {
   p.planetCategory.value = category
   refs.planet.material = refs.planetMaterials[category]
 
-  // Palette — filter by category compatibility
-  const compatible = PALETTES.filter(pal => !pal.categories || pal.categories.includes(category))
-  const palette = Math.random() < 0.6
-    ? compatible[Math.floor(Math.random() * compatible.length)]
-    : generatePalette()
+  // Palette — pick from curated base, optionally with subtle variation
+  const palette = pickPalette(category)
   applyPalette(refs, palette)
 
   // Category-specific parameters
   if (category === CATEGORY_ROCKY) randomizeRocky(refs)
   else if (category === CATEGORY_GAS) randomizeGas(refs)
-  else randomizeLiquid(refs)
+  else if (category === CATEGORY_LIQUID) randomizeLiquid(refs)
+  else if (category === CATEGORY_LAVA) randomizeLava(refs)
 
   // Shared cloud variation (only if clouds visible)
   if (refs.clouds.visible) {
@@ -204,7 +221,7 @@ export function randomizePlanet(refs: SceneRefs) {
   refs.atmosUniforms.glowPower.value = randomInRange(s.glowPower)
 
   // Planet size
-  const sizeKey = category === CATEGORY_GAS ? 'gas' : 'rocky'
+  const sizeKey = category === CATEGORY_GAS ? 'gas' : category === CATEGORY_LAVA ? 'lava' : category === CATEGORY_LIQUID ? 'liquid' : 'rocky'
   const size = SIZE_RANGES[sizeKey]
   const baseScale = size.base + Math.random() * size.range
   const deformX = 1.0 + (Math.random() - 0.5) * size.deform
@@ -233,7 +250,7 @@ export function randomizePlanet(refs: SceneRefs) {
   refs.sunFlare.position.copy(p.sunDirection.value).multiplyScalar(50)
 
   // Log planet state
-  const catName = category === CATEGORY_ROCKY ? 'Rocky' : category === CATEGORY_GAS ? 'Gas' : 'Liquid'
+  const catName = category === CATEGORY_ROCKY ? 'Rocky' : category === CATEGORY_GAS ? 'Gas' : category === CATEGORY_LIQUID ? 'Liquid' : 'Lava'
   console.log(`%c🪐 ${palette.name} (${catName})`, 'font-weight:bold;font-size:14px')
   console.log({
     palette: palette.name,
@@ -274,6 +291,7 @@ export function createRandomizeBar(refs: SceneRefs) {
     { label: 'Rocky', value: CATEGORY_ROCKY },
     { label: 'Gas Giant', value: CATEGORY_GAS },
     { label: 'Liquid', value: CATEGORY_LIQUID },
+    { label: 'Lava', value: CATEGORY_LAVA },
   ]
   for (const opt of options) {
     const o = document.createElement('option')

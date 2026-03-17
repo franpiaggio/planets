@@ -85,6 +85,21 @@ export const LIQUID_RANGES = {
 }
 
 // ---------------------------------------------------------------------------
+// Lava planet randomization ranges
+// ---------------------------------------------------------------------------
+
+export const LAVA_RANGES = {
+  noiseScale:      { min: 1.8, max: 3.0 },
+  lacunarity:      { min: 2.2, max: 2.8 },
+  gain:            { min: 0.4, max: 0.55 },
+  terrainHeight:   { min: 0.04, max: 0.10 },
+  warpStrength:    { min: 0.3, max: 0.7 },
+  ridgeStrength:   { min: 0.05, max: 0.15 },
+  worleyBlend:     { min: 0.2, max: 0.5 },
+  ringChance:      0.05,
+}
+
+// ---------------------------------------------------------------------------
 // Shared randomization ranges (apply to all categories)
 // ---------------------------------------------------------------------------
 
@@ -106,9 +121,10 @@ export const SHARED_RANGES = {
 // ---------------------------------------------------------------------------
 
 export const SIZE_RANGES: Record<string, { base: number; range: number; deform: number; oblate?: number }> = {
-  rocky:  { base: 0.6, range: 0.8, deform: 0.12 },
-  gas:    { base: 1.0, range: 0.6, deform: 0.12, oblate: 0.08 },
-  liquid: { base: 0.6, range: 0.8, deform: 0.12 },
+  rocky:   { base: 0.6, range: 0.8, deform: 0.12 },
+  gas:     { base: 1.0, range: 0.6, deform: 0.12, oblate: 0.08 },
+  liquid:  { base: 0.6, range: 0.8, deform: 0.12 },
+  lava:    { base: 0.5, range: 0.7, deform: 0.10 },
 }
 
 // ---------------------------------------------------------------------------
@@ -116,9 +132,10 @@ export const SIZE_RANGES: Record<string, { base: number; range: number; deform: 
 // ---------------------------------------------------------------------------
 
 export const CATEGORY_WEIGHTS = {
-  rocky: 0.60,    // 60%
-  gas: 0.25,      // 25%
+  rocky: 0.50,    // 50%
+  gas: 0.22,      // 22%
   liquid: 0.15,   // 15%
+  lava: 0.13,     // 13%
 }
 
 // ---------------------------------------------------------------------------

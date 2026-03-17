@@ -89,7 +89,7 @@ export const PALETTES: PlanetPalette[] = [
   // 3 — Volcanic
   {
     name: 'Volcanic',
-    categories: [1],
+    categories: [1, 4],
     seaLevel: 0.42,
     biome: {
       deepOcean: 0x1a0500, midOcean: 0x3a0a00,
@@ -981,4 +981,130 @@ export const PALETTES: PlanetPalette[] = [
     twilight: 0xd8864e,
     cloud: 0xfcfcfc,
   },
+
+  // ---------------------------------------------------------------------------
+  // Lava palettes (50–54)
+  // deepOcean/sand = lava glow colors, rock/rock2 = crust, snow = white-hot
+  // ---------------------------------------------------------------------------
+
+  // 50 — Inferno
+  {
+    name: 'Inferno',
+    categories: [4],
+    seaLevel: 0.45,
+    biome: {
+      deepOcean: 0x8a1500, midOcean: 0xb03000,
+      shallowWater: 0xd04a00, coast: 0xe06800,
+      sand: 0xff8c20, sand2: 0xffa040,
+      savanna: 0x1a1010, savanna2: 0x221414,
+      grass: 0x141010, grass2: 0x1a1212,
+      forest: 0x100c0c, forest2: 0x140e0e,
+      rock: 0x1e1818, rock2: 0x161212,
+      snow: 0xffe8a0, snowDirty: 0xffd070,
+    },
+    atmosphere: 0xd04020,
+    twilight: 0xff2800,
+    cloud: 0x3a2828,
+  },
+
+  // 51 — Magma
+  {
+    name: 'Magma',
+    categories: [4],
+    seaLevel: 0.45,
+    biome: {
+      deepOcean: 0x6a0800, midOcean: 0x9a1800,
+      shallowWater: 0xc03000, coast: 0xd84800,
+      sand: 0xf07020, sand2: 0xf88830,
+      savanna: 0x181010, savanna2: 0x201414,
+      grass: 0x121010, grass2: 0x181212,
+      forest: 0x0e0a0a, forest2: 0x120c0c,
+      rock: 0x242020, rock2: 0x1c1818,
+      snow: 0xffd880, snowDirty: 0xf0c060,
+    },
+    atmosphere: 0xb83818,
+    twilight: 0xe02000,
+    cloud: 0x302020,
+  },
+
+  // 52 — Hellfire
+  {
+    name: 'Hellfire',
+    categories: [4],
+    seaLevel: 0.45,
+    biome: {
+      deepOcean: 0xa02000, midOcean: 0xc84000,
+      shallowWater: 0xe06000, coast: 0xf08000,
+      sand: 0xffa830, sand2: 0xffc050,
+      savanna: 0x1c1414, savanna2: 0x241818,
+      grass: 0x161010, grass2: 0x1c1414,
+      forest: 0x120e0e, forest2: 0x161010,
+      rock: 0x2a2020, rock2: 0x201818,
+      snow: 0xfff0b0, snowDirty: 0xffe090,
+    },
+    atmosphere: 0xe05028,
+    twilight: 0xff3800,
+    cloud: 0x382828,
+  },
+
+  // 53 — Ember
+  {
+    name: 'Ember',
+    categories: [4],
+    seaLevel: 0.45,
+    biome: {
+      deepOcean: 0x5a0a00, midOcean: 0x7a1800,
+      shallowWater: 0xa02800, coast: 0xc04000,
+      sand: 0xe06020, sand2: 0xf07830,
+      savanna: 0x161010, savanna2: 0x1e1414,
+      grass: 0x100c0c, grass2: 0x160e0e,
+      forest: 0x0c0808, forest2: 0x100a0a,
+      rock: 0x201a1a, rock2: 0x181414,
+      snow: 0xfcc870, snowDirty: 0xe8b058,
+    },
+    atmosphere: 0xa03020,
+    twilight: 0xd02800,
+    cloud: 0x2a1e1e,
+  },
+
+  // 54 — Blue Lava
+  {
+    name: 'Blue Lava',
+    categories: [4],
+    seaLevel: 0.45,
+    biome: {
+      deepOcean: 0x0a1848, midOcean: 0x1a3078,
+      shallowWater: 0x2a48a0, coast: 0x3a60c0,
+      sand: 0x5080e0, sand2: 0x6898f0,
+      savanna: 0x101018, savanna2: 0x141420,
+      grass: 0x0c0c14, grass2: 0x101018,
+      forest: 0x08080e, forest2: 0x0c0c12,
+      rock: 0x181828, rock2: 0x121220,
+      snow: 0xa0c0ff, snowDirty: 0x80a8f0,
+    },
+    atmosphere: 0x3050c0,
+    twilight: 0x2040a0,
+    cloud: 0x1a1a30,
+  },
+
+  // 59 — Jupiter Storm
+  {
+    name: 'Jupiter Storm',
+    categories: [2],
+    seaLevel: 0.45,
+    biome: {
+      deepOcean: 0x8a6840, midOcean: 0xa08050,
+      shallowWater: 0xc0a070, coast: 0xd0b080,
+      sand: 0xe8c890, sand2: 0xf0d8a8,
+      savanna: 0x705838, savanna2: 0x886848,
+      grass: 0x987858, grass2: 0xa88868,
+      forest: 0x504028, forest2: 0x604830,
+      rock: 0x887050, rock2: 0x786040,
+      snow: 0xf8f0d0, snowDirty: 0xf0e0b8,
+    },
+    atmosphere: 0xc0a070,
+    twilight: 0xa08050,
+    cloud: 0xf0e8d0,
+  },
+
 ]
